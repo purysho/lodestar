@@ -46,6 +46,7 @@ export default function ConstellationLayer({
   stars,
   suggestions,
   tagColors,
+  hiddenTagIds,
   onSelectSuggestion,
 }) {
   const starsById = new Map(stars.map((star) => [star.id, star]))
@@ -62,7 +63,9 @@ export default function ConstellationLayer({
             if (!from || !to) return null
             const sharedTags = getSharedTags(from, to, Object.keys(tagColors))
             const edgeTag = constellation.edgeTagOverrides?.[getEdgeKey(from.id, to.id)]
-            const linkTag = edgeTag ?? sharedTags[0]
+            if (edgeTag && hiddenTagIds.has(edgeTag)) return null
+            const linkTag = edgeTag ?? sharedTags.find((tag) => !hiddenTagIds.has(tag))
+            if (!linkTag && sharedTags.length > 0) return null
 
             return (
               <line

@@ -1,14 +1,12 @@
 import React from 'react'
 
 export default function SkyToolbar({
-  colorsVisible,
   suggestionCount,
   suggestionsVisible,
   onAddStar,
   onExport,
   onImportFile,
   onShare,
-  onToggleColors,
   onToggleSuggestions,
 }) {
   function handleFileChange(event) {
@@ -27,14 +25,6 @@ export default function SkyToolbar({
       >
         Suggestions {suggestionsVisible ? 'on' : 'off'}
         {suggestionCount > 0 ? ` · ${suggestionCount}` : ''}
-      </button>
-      <button
-        className="rounded-full border border-white/10 bg-night-900/60 px-3 py-2 text-xs text-slate-300 transition hover:border-white/25 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-aurora sm:px-4 sm:text-sm"
-        type="button"
-        aria-pressed={colorsVisible}
-        onClick={onToggleColors}
-      >
-        Colours {colorsVisible ? 'on' : 'off'}
       </button>
       <button
         className="rounded-full border border-white/10 bg-night-900/60 px-3 py-2 text-xs text-slate-300 transition hover:border-white/25 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-aurora sm:text-sm"
