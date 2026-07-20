@@ -3,6 +3,7 @@ import { useMemo, useRef, useState } from 'react'
 
 import AddStarForm from './components/AddStarForm.jsx'
 import ConstellationIndex from './components/ConstellationIndex.jsx'
+import StarterPrompts from './components/StarterPrompts.jsx'
 import SkyCanvas from './components/SkyCanvas.jsx'
 import SkySearch from './components/SkySearch.jsx'
 import SkyToolbar from './components/SkyToolbar.jsx'
@@ -136,6 +137,8 @@ export default function App() {
   const [isSearching, setIsSearching] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [isConstellationIndexOpen, setIsConstellationIndexOpen] = useState(false)
+  const [isPromptPickerOpen, setIsPromptPickerOpen] = useState(false)
+  const [addStarPrompt, setAddStarPrompt] = useState('')
 
   const tagColors = useMemo(
     () => deriveTagColors(sky.stars, sky.tagColorOverrides),
@@ -188,6 +191,7 @@ export default function App() {
 
   function closeAddStarForm() {
     setIsAddingStar(false)
+    setAddStarPrompt('')
     globalThis.requestAnimationFrame(() => addStarButtonRef.current?.focus())
   }
 
@@ -613,6 +617,7 @@ export default function App() {
         selectedStar={selectedStar}
         onAcceptSuggestion={handleAcceptSuggestion}
         onAddStar={() => setIsAddingStar(true)}
+        onOpenPrompts={() => setIsPromptPickerOpen(true)}
         onCancelConnection={() => setConnectionDraft(null)}
         onCloseStar={() => setSelectedStarId(null)}
         onCloseSuggestion={() => setSelectedSuggestionId(null)}
@@ -665,8 +670,19 @@ export default function App() {
         />
       ) : null}
 
+      {isPromptPickerOpen ? (
+        <StarterPrompts
+          onClose={() => setIsPromptPickerOpen(false)}
+          onChoose={(prompt) => {
+            setAddStarPrompt(prompt)
+            setIsPromptPickerOpen(false)
+            setIsAddingStar(true)
+          }}
+        />
+      ) : null}
+
       {isAddingStar ? (
-        <AddStarForm onCancel={closeAddStarForm} onSave={handleAddStar} />
+        <AddStarForm prompt={addStarPrompt} onCancel={closeAddStarForm} onSave={handleAddStar} />
       ) : null}
 
       {shareUrl ? (

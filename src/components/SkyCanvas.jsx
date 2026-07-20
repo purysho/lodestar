@@ -108,6 +108,7 @@ export default function SkyCanvas({
   connectionDraft,
   onAcceptSuggestion,
   onAddStar,
+  onOpenPrompts,
   onCancelConnection,
   onCloseStar,
   onCloseSuggestion,
@@ -188,6 +189,9 @@ export default function SkyCanvas({
                 <p className="mt-6 text-xs leading-6 text-slate-500">
                   A question that stays with you · a link worth returning to · a thought to keep nearby
                 </p>
+                <button className="mt-2 text-xs text-aurora transition hover:text-starlight focus:outline-none focus-visible:ring-2 focus-visible:ring-aurora" type="button" onClick={onOpenPrompts}>
+                  Need a spark?
+                </button>
               </>
             ) : (
               <button

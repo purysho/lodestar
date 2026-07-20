@@ -8,7 +8,7 @@ const EMPTY_FORM = {
   url: '',
 }
 
-export default function AddStarForm({ onCancel, onSave }) {
+export default function AddStarForm({ onCancel, onSave, prompt = '' }) {
   const [form, setForm] = useState(EMPTY_FORM)
   const dialogRef = useRef(null)
 
@@ -81,7 +81,7 @@ export default function AddStarForm({ onCancel, onSave }) {
           <h2 id="add-star-title" className="font-display text-2xl text-starlight">
             Place a new light
           </h2>
-          <p className="mt-2 text-sm text-slate-400">Keep only what made you pause.</p>
+          <p className="mt-2 text-sm text-slate-400">{prompt || 'Keep only what made you pause.'}</p>
         </div>
 
         <form className="space-y-4" onSubmit={handleSubmit}>
@@ -91,7 +91,7 @@ export default function AddStarForm({ onCancel, onSave }) {
               autoFocus
               className="mt-2 w-full rounded-xl border border-white/10 bg-night-950/70 px-4 py-3 text-base text-white outline-none transition placeholder:text-slate-600 focus:border-aurora focus:ring-2 focus:ring-aurora/25"
               name="title"
-              placeholder="Something that struck you"
+              placeholder={prompt || 'Something that struck you'}
               required
               value={form.title}
               onChange={updateField}
