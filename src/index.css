@@ -50,3 +50,56 @@ textarea {
   background: rgba(159, 174, 255, 0.32);
   color: #fff;
 }
+
+.star-halo {
+  fill: rgba(255, 244, 207, 0.06);
+  filter: blur(4px);
+}
+
+.star-core {
+  animation: twinkle var(--twinkle-duration) ease-in-out var(--twinkle-delay) infinite;
+  fill: #fff4cf;
+  filter: drop-shadow(0 0 4px rgba(255, 244, 207, 0.82));
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.star-node:focus .star-core {
+  filter:
+    drop-shadow(0 0 5px rgba(255, 244, 207, 1))
+    drop-shadow(0 0 10px rgba(159, 174, 255, 0.9));
+  stroke: #9faeff;
+  stroke-width: 2px;
+}
+
+@keyframes twinkle {
+  0%,
+  100% {
+    opacity: 0.56;
+    transform: scale(0.86);
+  }
+
+  48% {
+    opacity: 1;
+    transform: scale(1.12);
+  }
+
+  72% {
+    opacity: 0.76;
+    transform: scale(0.98);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+  }
+
+  .star-core {
+    animation: none;
+    opacity: 0.9;
+    transform: none;
+  }
+}

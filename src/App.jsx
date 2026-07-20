@@ -1,9 +1,54 @@
 import React from 'react'
+import { useState } from 'react'
+
+import AddStarForm from './components/AddStarForm.jsx'
+import SkyCanvas from './components/SkyCanvas.jsx'
+import { loadSky, saveSky } from './lib/store.js'
+
+function createId(prefix) {
+  const token = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`
+  return `${prefix}-${token}`
+}
+
+function positionForStar(index) {
+  const angle = index * 2.3999632297 - Math.PI / 2
+  const radius = Math.min(0.38, 0.12 + index * 0.032)
+
+  return {
+    x: Math.min(0.9, Math.max(0.1, 0.5 + Math.cos(angle) * radius)),
+    y: Math.min(0.86, Math.max(0.14, 0.52 + Math.sin(angle) * radius)),
+  }
+}
 
 export default function App() {
+  const [sky, setSky] = useState(() => loadSky())
+  const [isAddingStar, setIsAddingStar] = useState(false)
+
+  function handleAddStar(values) {
+    setSky((currentSky) => {
+      const position = positionForStar(currentSky.stars.length)
+      const nextSky = {
+        ...currentSky,
+        stars: [
+          ...currentSky.stars,
+          {
+            id: createId('star'),
+            ...values,
+            ...position,
+            origin: 'manual',
+            createdAt: new Date().toISOString(),
+          },
+        ],
+      }
+
+      return saveSky(nextSky)
+    })
+    setIsAddingStar(false)
+  }
+
   return (
     <main className="sky-shell relative min-h-screen overflow-hidden bg-night-950 text-white">
-      <header className="relative z-10 flex items-center justify-between px-6 py-6 sm:px-10">
+      <header className="relative z-20 flex items-center justify-between px-6 py-6 sm:px-10">
         <a
           className="font-display text-xl tracking-[0.18em] text-starlight"
           href="./"
@@ -11,26 +56,25 @@ export default function App() {
         >
           Lodestar
         </a>
-        <p className="text-xs tracking-[0.16em] text-slate-400">A sky that remembers</p>
+        <div className="flex items-center gap-5">
+          <p className="hidden text-xs tracking-[0.16em] text-slate-400 sm:block">
+            A sky that remembers
+          </p>
+          <button
+            className="rounded-full border border-aurora/40 bg-night-800/70 px-4 py-2 text-sm font-medium tracking-wide text-slate-100 transition hover:border-aurora hover:bg-night-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-aurora"
+            type="button"
+            onClick={() => setIsAddingStar(true)}
+          >
+            Add a star
+          </button>
+        </div>
       </header>
 
-      <section
-        className="relative z-10 flex min-h-[calc(100vh-88px)] items-center justify-center px-6 pb-24 text-center"
-        aria-labelledby="empty-sky-title"
-      >
-        <div className="max-w-md">
-          <div className="mx-auto mb-8 h-1.5 w-1.5 rounded-full bg-starlight shadow-star" />
-          <h1
-            id="empty-sky-title"
-            className="font-display text-3xl leading-tight text-slate-100 sm:text-4xl"
-          >
-            Your sky is empty.
-          </h1>
-          <p className="mt-4 text-sm leading-6 text-slate-400 sm:text-base">
-            Add something that struck you.
-          </p>
-        </div>
-      </section>
+      <SkyCanvas stars={sky.stars} />
+
+      {isAddingStar ? (
+        <AddStarForm onCancel={() => setIsAddingStar(false)} onSave={handleAddStar} />
+      ) : null}
     </main>
   )
 }
