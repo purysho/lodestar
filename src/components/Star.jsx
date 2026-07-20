@@ -12,6 +12,7 @@ function hashString(value) {
 export default function Star({
   star,
   tagColors,
+  colorsVisible,
   isSelected,
   isConnectionOrigin,
   onMove,
@@ -76,6 +77,7 @@ export default function Star({
       tabIndex="0"
       aria-label={`${star.title}. Star in your sky.`}
       aria-pressed={isSelected}
+      data-tag-colors={colorsVisible ? 'visible' : 'hidden'}
       data-connection-origin={isConnectionOrigin ? 'true' : 'false'}
       style={{
         '--star-tag-color': primaryTagColor,
@@ -96,18 +98,20 @@ export default function Star({
         cy={`${star.y * 100}%`}
         r={radius * 3.8}
       />
-      {visibleTags.map((tag, index) => (
-        <circle
-          key={tag}
-          className="star-tag-ring"
-          cx={`${star.x * 100}%`}
-          cy={`${star.y * 100}%`}
-          r={radius * (2.1 + index * 0.7)}
-          style={{ '--tag-color': tagColors[tag] }}
-        >
-          <title>{tag}</title>
-        </circle>
-      ))}
+      {colorsVisible
+        ? visibleTags.map((tag, index) => (
+            <circle
+              key={tag}
+              className="star-tag-ring"
+              cx={`${star.x * 100}%`}
+              cy={`${star.y * 100}%`}
+              r={radius * (2.1 + index * 0.7)}
+              style={{ '--tag-color': tagColors[tag] }}
+            >
+              <title>{tag}</title>
+            </circle>
+          ))
+        : null}
       <circle
         className="star-core"
         cx={`${star.x * 100}%`}
