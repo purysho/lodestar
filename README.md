@@ -9,7 +9,7 @@ constellations that matter to you.
 > The sky lives entirely in your browser. Lodestar has no accounts, backend,
 > tracking, external data calls, or secrets.
 
-<!-- Replace this note with a short GIF of the living sky before launch. -->
+![Lodestar sky with colour-coded stars, authored constellations, and suggested links](lodestar-sky.png)
 
 ## Quick start
 
