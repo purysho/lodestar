@@ -1,5 +1,7 @@
 import React from 'react'
 
+import { getSharedTags, getTagColor } from '../lib/suggestions.js'
+
 function SuggestedLine({ suggestion, from, to, onSelect }) {
   function handleKeyDown(event) {
     if (event.key !== 'Enter' && event.key !== ' ') return
@@ -15,6 +17,7 @@ function SuggestedLine({ suggestion, from, to, onSelect }) {
       role="button"
       tabIndex="0"
       aria-label={label}
+      style={{ '--link-color': getTagColor(suggestion.sharedTags[0]) }}
       onClick={() => onSelect(suggestion.id)}
       onKeyDown={handleKeyDown}
     >
@@ -55,11 +58,17 @@ export default function ConstellationLayer({
             const from = starsById.get(constellation.starIds[index])
             const to = starsById.get(starId)
             if (!from || !to) return null
+            const sharedTags = getSharedTags(from, to)
 
             return (
               <line
                 key={`${constellation.id}:${from.id}:${to.id}`}
                 className="constellation-line"
+                style={
+                  sharedTags.length > 0
+                    ? { '--link-color': getTagColor(sharedTags[0]) }
+                    : undefined
+                }
                 x1={`${from.x * 100}%`}
                 y1={`${from.y * 100}%`}
                 x2={`${to.x * 100}%`}

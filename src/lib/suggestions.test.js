@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { deriveSuggestions } from './suggestions.js'
+import { deriveSuggestions, getSharedTags, getTagColor, normalizeTags } from './suggestions.js'
 
 const stars = [
   { id: 'star-a', tags: ['Wonder', 'biology'] },
@@ -10,6 +10,16 @@ const stars = [
 ]
 
 describe('tag-derived suggestions', () => {
+  it('assigns the same deterministic colour to normalized versions of a tag', () => {
+    expect(getTagColor('Wonder')).toBe(getTagColor(' wonder '))
+    expect(getTagColor('Wonder')).toMatch(/^#[0-9a-f]{6}$/)
+    expect(normalizeTags([' Wonder ', 'wonder', 'BIOLOGY'])).toEqual(['biology', 'wonder'])
+  })
+
+  it('derives the colourable tags shared by a pair of stars', () => {
+    expect(getSharedTags(stars[0], stars[3])).toEqual(['biology', 'wonder'])
+  })
+
   it('suggests each pair that shares an exact normalized tag', () => {
     expect(deriveSuggestions(stars)).toEqual([
       {

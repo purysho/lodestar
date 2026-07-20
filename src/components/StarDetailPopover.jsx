@@ -1,5 +1,7 @@
 import React from 'react'
 
+import { getTagColor, normalizeTags } from '../lib/suggestions.js'
+
 function getAdjacentStarIds(constellation, starId) {
   const index = constellation.starIds.indexOf(starId)
   if (index === -1) return []
@@ -98,7 +100,22 @@ export default function StarDetailPopover({
       </div>
 
       {star.tags.length > 0 ? (
-        <p className="mt-4 text-xs tracking-wide text-aurora/90">{star.tags.join(' · ')}</p>
+        <div className="mt-4 flex flex-wrap gap-2" aria-label="Star tags">
+          {normalizeTags(star.tags).map((tag) => {
+            const tagColor = getTagColor(tag)
+
+            return (
+              <span
+                key={tag}
+                className="tag-chip"
+                style={{ '--tag-color': tagColor }}
+              >
+                <span className="tag-chip-dot" aria-hidden="true" />
+                {tag}
+              </span>
+            )
+          })}
+        </div>
       ) : null}
 
       <div className="mt-5 border-t border-white/10 pt-4">
