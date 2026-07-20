@@ -52,14 +52,26 @@ textarea {
 }
 
 .star-halo {
-  fill: rgba(255, 244, 207, 0.06);
+  fill: var(--star-tag-color, #fff4cf);
+  fill-opacity: 0.13;
   filter: blur(4px);
+}
+
+.star-tag-ring {
+  fill: none;
+  pointer-events: none;
+  stroke: var(--tag-color);
+  stroke-opacity: 0.35;
+  stroke-width: 0.7px;
+  vector-effect: non-scaling-stroke;
 }
 
 .star-core {
   animation: twinkle var(--twinkle-duration) ease-in-out var(--twinkle-delay) infinite;
   fill: #fff4cf;
   filter: drop-shadow(0 0 4px rgba(255, 244, 207, 0.82));
+  stroke: var(--star-tag-color, #fff4cf);
+  stroke-width: 0.7px;
   transform-box: fill-box;
   transform-origin: center;
 }
@@ -89,9 +101,10 @@ textarea {
 }
 
 .constellation-line {
-  filter: drop-shadow(0 0 3px rgba(213, 220, 255, 0.3));
+  filter: drop-shadow(0 0 3px var(--link-color, rgba(213, 220, 255, 0.3)));
   pointer-events: none;
-  stroke: rgba(229, 233, 255, 0.72);
+  stroke: var(--link-color, #e5e9ff);
+  stroke-opacity: 0.72;
   stroke-linecap: round;
   stroke-width: 1.35px;
   vector-effect: non-scaling-stroke;
@@ -111,7 +124,8 @@ textarea {
 
 .suggestion-line {
   pointer-events: none;
-  stroke: rgba(159, 174, 255, 0.28);
+  stroke: var(--link-color, #9faeff);
+  stroke-opacity: 0.34;
   stroke-dasharray: 2 7;
   stroke-linecap: round;
   stroke-width: 1.2px;
@@ -119,9 +133,26 @@ textarea {
 
 .suggested-connection:hover .suggestion-line,
 .suggested-connection:focus .suggestion-line {
-  filter: drop-shadow(0 0 3px rgba(159, 174, 255, 0.5));
-  stroke: rgba(190, 200, 255, 0.58);
+  filter: drop-shadow(0 0 3px var(--link-color, #9faeff));
+  stroke-opacity: 0.72;
   stroke-width: 1.6px;
+}
+
+.tag-chip {
+  align-items: center;
+  color: var(--tag-color);
+  display: inline-flex;
+  font-size: 0.72rem;
+  gap: 0.4rem;
+  letter-spacing: 0.04em;
+}
+
+.tag-chip-dot {
+  background: var(--tag-color);
+  border-radius: 9999px;
+  box-shadow: 0 0 8px var(--tag-color);
+  height: 0.42rem;
+  width: 0.42rem;
 }
 
 @keyframes twinkle {

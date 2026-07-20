@@ -1,6 +1,8 @@
 import React from 'react'
 import { useRef, useState } from 'react'
 
+import { getTagColor, normalizeTags } from '../lib/suggestions.js'
+
 function hashString(value) {
   let hash = 0
   for (const character of value) hash = (hash * 31 + character.charCodeAt(0)) % 997
@@ -15,6 +17,8 @@ export default function Star({ star, isSelected, isConnectionOrigin, onMove, onS
   const ageInDays = Math.max(0, (Date.now() - Date.parse(star.createdAt)) / 86_400_000)
   const recencyGlow = Math.max(0, 1 - ageInDays / 30)
   const radius = 3.4 + recencyGlow * 1.2
+  const visibleTags = normalizeTags(star.tags).slice(0, 3)
+  const primaryTagColor = visibleTags.length > 0 ? getTagColor(visibleTags[0]) : '#fff4cf'
 
   function handlePointerDown(event) {
     if (event.button !== 0) return
@@ -67,6 +71,7 @@ export default function Star({ star, isSelected, isConnectionOrigin, onMove, onS
       aria-pressed={isSelected}
       data-connection-origin={isConnectionOrigin ? 'true' : 'false'}
       style={{
+        '--star-tag-color': primaryTagColor,
         '--twinkle-delay': `${-(hash % 37) / 10}s`,
         '--twinkle-duration': `${4.8 + (hash % 23) / 10}s`,
       }}
@@ -84,6 +89,18 @@ export default function Star({ star, isSelected, isConnectionOrigin, onMove, onS
         cy={`${star.y * 100}%`}
         r={radius * 3.8}
       />
+      {visibleTags.map((tag, index) => (
+        <circle
+          key={tag}
+          className="star-tag-ring"
+          cx={`${star.x * 100}%`}
+          cy={`${star.y * 100}%`}
+          r={radius * (2.1 + index * 0.7)}
+          style={{ '--tag-color': getTagColor(tag) }}
+        >
+          <title>{tag}</title>
+        </circle>
+      ))}
       <circle
         className="star-core"
         cx={`${star.x * 100}%`}

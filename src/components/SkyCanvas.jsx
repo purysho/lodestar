@@ -1,5 +1,6 @@
 import React from 'react'
 
+import { getTagColor, normalizeTags } from '../lib/suggestions.js'
 import ConstellationLayer from './ConstellationLayer.jsx'
 import Star from './Star.jsx'
 import StarDetailPopover from './StarDetailPopover.jsx'
@@ -29,6 +30,9 @@ export default function SkyCanvas({
   const starsById = new Map(stars.map((star) => [star.id, star]))
   const suggestionStars = selectedSuggestion?.starIds.map((starId) => starsById.get(starId))
   const skyLabel = `${stars.length} ${stars.length === 1 ? 'star' : 'stars'} in your sky`
+  const tags = [...new Set(stars.flatMap((star) => normalizeTags(star.tags)))]
+    .sort()
+    .slice(0, 8)
 
   return (
     <section className="absolute inset-0 z-10" aria-label="Your sky">
@@ -66,6 +70,25 @@ export default function SkyCanvas({
             </p>
           </div>
         </div>
+      ) : null}
+
+      {tags.length > 0 ? (
+        <aside
+          className="pointer-events-none absolute bottom-5 left-5 z-20 max-w-[calc(100%-2.5rem)] rounded-2xl border border-white/10 bg-night-950/65 px-4 py-3 shadow-xl shadow-black/20 backdrop-blur-sm sm:bottom-8 sm:left-8"
+          aria-label="Tag colour key"
+        >
+          <p className="text-[0.65rem] font-semibold uppercase tracking-[0.16em] text-slate-500">
+            Tag colour key
+          </p>
+          <div className="mt-2 flex max-w-md flex-wrap gap-x-3 gap-y-2">
+            {tags.map((tag) => (
+              <span key={tag} className="tag-chip" style={{ '--tag-color': getTagColor(tag) }}>
+                <span className="tag-chip-dot" aria-hidden="true" />
+                {tag}
+              </span>
+            ))}
+          </div>
+        </aside>
       ) : null}
 
       {selectedStar ? (
@@ -122,7 +145,13 @@ export default function SkyCanvas({
             </button>
           </div>
           <p className="mt-3 text-sm text-slate-400">
-            Shared {selectedSuggestion.sharedTags.join(' · ')}
+            Shared{' '}
+            {selectedSuggestion.sharedTags.map((tag, index) => (
+              <React.Fragment key={tag}>
+                {index > 0 ? ' · ' : null}
+                <span style={{ color: getTagColor(tag) }}>{tag}</span>
+              </React.Fragment>
+            ))}
           </p>
           <div className="mt-5 flex justify-end gap-2 border-t border-white/10 pt-4">
             <button
