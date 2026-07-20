@@ -1,14 +1,3 @@
-const TAG_COLORS = [
-  '#7dd3fc',
-  '#c4b5fd',
-  '#fda4af',
-  '#fde68a',
-  '#86efac',
-  '#fdba74',
-  '#f0abfc',
-  '#93c5fd',
-]
-
 export function normalizeTags(tags) {
   return [
     ...new Set(
@@ -28,7 +17,7 @@ export function getTagColor(tag) {
     hash = Math.imul(hash, 16777619)
   }
 
-  return TAG_COLORS[(hash >>> 0) % TAG_COLORS.length]
+  return `hsl(${(hash >>> 0) % 360} 82% 72%)`
 }
 
 export function getSharedTags(firstStar, secondStar) {

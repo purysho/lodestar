@@ -12,8 +12,14 @@ const stars = [
 describe('tag-derived suggestions', () => {
   it('assigns the same deterministic colour to normalized versions of a tag', () => {
     expect(getTagColor('Wonder')).toBe(getTagColor(' wonder '))
-    expect(getTagColor('Wonder')).toMatch(/^#[0-9a-f]{6}$/)
+    expect(getTagColor('Wonder')).toMatch(/^hsl\(\d{1,3} 82% 72%\)$/)
     expect(normalizeTags([' Wonder ', 'wonder', 'BIOLOGY'])).toEqual(['biology', 'wonder'])
+  })
+
+  it('keeps a representative sky palette distinct', () => {
+    const colours = ['education', 'handbook', 'library', 'llms', 'science'].map(getTagColor)
+
+    expect(new Set(colours).size).toBe(colours.length)
   })
 
   it('derives the colourable tags shared by a pair of stars', () => {
