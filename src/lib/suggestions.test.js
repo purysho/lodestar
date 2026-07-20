@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest'
 
-import { deriveSuggestions, getSharedTags, getTagColor, normalizeTags } from './suggestions.js'
+import {
+  deriveSuggestions,
+  deriveTagColors,
+  getEdgeKey,
+  getOrderedTags,
+  getSharedTags,
+  normalizeTags,
+} from './suggestions.js'
 
 const stars = [
   { id: 'star-a', tags: ['Wonder', 'biology'] },
@@ -10,14 +17,32 @@ const stars = [
 ]
 
 describe('tag-derived suggestions', () => {
-  it('assigns the same deterministic colour to normalized versions of a tag', () => {
-    expect(getTagColor('Wonder')).toBe(getTagColor(' wonder '))
-    expect(getTagColor('Wonder')).toMatch(/^#[0-9a-f]{6}$/)
-    expect(normalizeTags([' Wonder ', 'wonder', 'BIOLOGY'])).toEqual(['biology', 'wonder'])
+  it('preserves star tag order while using a stable automatic colour order', () => {
+    expect(normalizeTags([' Wonder ', 'wonder', 'BIOLOGY'])).toEqual(['wonder', 'biology'])
+    expect(getOrderedTags(stars)).toEqual(['biology', 'history', 'space', 'wonder'])
+    expect(
+      getOrderedTags(stars.map((star) => ({ ...star, tags: [...star.tags].reverse() }))),
+    ).toEqual(['biology', 'history', 'space', 'wonder'])
+  })
+
+  it('assigns ordered, distinct colours and applies authored overrides', () => {
+    const tagColors = deriveTagColors(stars, { biology: '#123456' })
+
+    expect(tagColors).toMatchObject({
+      biology: '#123456',
+      history: '#f472b6',
+      space: '#facc15',
+      wonder: '#a78bfa',
+    })
+    expect(new Set(Object.values(tagColors)).size).toBe(4)
   })
 
   it('derives the colourable tags shared by a pair of stars', () => {
-    expect(getSharedTags(stars[0], stars[3])).toEqual(['biology', 'wonder'])
+    expect(getSharedTags(stars[0], stars[3], getOrderedTags(stars))).toEqual([
+      'biology',
+      'wonder',
+    ])
+    expect(getEdgeKey('star-b', 'star-a')).toBe('star-a::star-b')
   })
 
   it('suggests each pair that shares an exact normalized tag', () => {

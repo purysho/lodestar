@@ -22,7 +22,7 @@ function createMemoryStorage(initial = {}) {
 
 function createSky() {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     stars: [
       {
         id: 'star-1',
@@ -42,8 +42,10 @@ function createSky() {
         name: 'Questions for midnight',
         starIds: ['star-1'],
         createdAt: '2026-07-20T12:05:00.000Z',
+        edgeTagOverrides: {},
       },
     ],
+    tagColorOverrides: {},
   }
 }
 
@@ -105,6 +107,26 @@ describe('the Lodestar store', () => {
     })
   })
 
+  it('migrates a schema v1 sky through the real v1 to v2 migration', () => {
+    const versionOne = {
+      schemaVersion: 1,
+      stars: createSky().stars,
+      constellations: createSky().constellations.map(
+        ({ edgeTagOverrides: _edgeTagOverrides, ...constellation }) => constellation,
+      ),
+    }
+
+    expect(importSky(JSON.stringify(versionOne))).toEqual({
+      ...versionOne,
+      schemaVersion: 2,
+      constellations: versionOne.constellations.map((constellation) => ({
+        ...constellation,
+        edgeTagOverrides: {},
+      })),
+      tagColorOverrides: {},
+    })
+  })
+
   it('round-trips export and import without losing saved data', () => {
     const sky = createSky()
 
@@ -140,6 +162,38 @@ describe('the Lodestar store', () => {
     ).toThrow('invalid star coordinates')
   })
 
+  it('round-trips authored tag colours and connection meanings', () => {
+    const sky = createSky()
+    sky.stars.push({
+      ...sky.stars[0],
+      id: 'star-2',
+      title: 'How memory forms',
+      x: 0.7,
+    })
+    sky.constellations[0].starIds.push('star-2')
+    sky.constellations[0].edgeTagOverrides['star-1::star-2'] = 'biology'
+    sky.tagColorOverrides.biology = '#12abef'
+
+    expect(importSky(exportSky(sky))).toEqual(sky)
+  })
+
+  it('rejects a connection meaning that its stars do not share', () => {
+    const sky = createSky()
+    sky.stars.push({
+      ...sky.stars[0],
+      id: 'star-2',
+      title: 'A different light',
+      tags: ['history'],
+      x: 0.7,
+    })
+    sky.constellations[0].starIds.push('star-2')
+    sky.constellations[0].edgeTagOverrides['star-1::star-2'] = 'biology'
+
+    expect(() => importSky(JSON.stringify(sky))).toThrow(
+      'connection tag that its stars do not share',
+    )
+  })
+
   it('persists only stars and user-drawn constellations, never suggestions', () => {
     const storage = createMemoryStorage()
     const sky = {
@@ -156,7 +210,12 @@ describe('the Lodestar store', () => {
     saveSky(sky, { storage })
 
     const persisted = JSON.parse(storage.setItem.mock.calls[0][1])
-    expect(Object.keys(persisted)).toEqual(['schemaVersion', 'stars', 'constellations'])
+    expect(Object.keys(persisted)).toEqual([
+      'schemaVersion',
+      'stars',
+      'constellations',
+      'tagColorOverrides',
+    ])
     expect(JSON.stringify(persisted)).not.toContain('suggest')
   })
 })

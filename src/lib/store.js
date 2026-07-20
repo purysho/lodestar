@@ -1,9 +1,29 @@
 export const STORAGE_KEY = 'lodestar:sky'
-export const CURRENT_SCHEMA_VERSION = 1
+export const CURRENT_SCHEMA_VERSION = 2
 export const MAX_SHARE_URL_LENGTH = 8_000
 
 // Add migrations as the schema grows: key N migrates version N to N + 1.
-export const MIGRATIONS = Object.freeze({})
+export const MIGRATIONS = Object.freeze({
+  1: (sky) => ({
+    ...sky,
+    schemaVersion: 2,
+    tagColorOverrides: {},
+    constellations: sky.constellations.map((constellation) => ({
+      ...constellation,
+      edgeTagOverrides: {},
+    })),
+  }),
+})
+
+const HEX_COLOR = /^#[0-9a-f]{6}$/iu
+
+function normalizeTag(tag) {
+  return typeof tag === 'string' ? tag.trim().toLowerCase() : ''
+}
+
+function edgeKey(firstStarId, secondStarId) {
+  return [firstStarId, secondStarId].sort().join('::')
+}
 
 function requireNonEmptyString(value, field) {
   if (typeof value !== 'string' || !value.trim()) {
@@ -42,7 +62,28 @@ function toPersistedStar(star) {
   }
 }
 
-function toPersistedConstellation(constellation) {
+function toPersistedEdgeTagOverrides(value, starIds) {
+  if (value === undefined) return {}
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('Sky data contains invalid connection tag overrides.')
+  }
+
+  const validEdgeKeys = new Set(
+    starIds.slice(1).map((starId, index) => edgeKey(starIds[index], starId)),
+  )
+
+  return Object.fromEntries(
+    Object.entries(value).map(([key, tag]) => {
+      const normalizedTag = normalizeTag(tag)
+      if (!validEdgeKeys.has(key) || !normalizedTag) {
+        throw new Error('Sky data contains invalid connection tag overrides.')
+      }
+      return [key, normalizedTag]
+    }),
+  )
+}
+
+function toPersistedConstellation(constellation, schemaVersion) {
   if (!constellation || typeof constellation !== 'object' || Array.isArray(constellation)) {
     throw new Error('Sky data contains an invalid constellation.')
   }
@@ -53,7 +94,7 @@ function toPersistedConstellation(constellation) {
     throw new Error('Sky data contains invalid constellation stars.')
   }
 
-  return {
+  const persisted = {
     id: requireNonEmptyString(constellation.id, 'constellation id'),
     name: typeof constellation.name === 'string' ? constellation.name : '',
     starIds: structuredClone(constellation.starIds),
@@ -62,6 +103,32 @@ function toPersistedConstellation(constellation) {
       'constellation creation date',
     ),
   }
+
+  if (schemaVersion >= 2) {
+    persisted.edgeTagOverrides = toPersistedEdgeTagOverrides(
+      constellation.edgeTagOverrides,
+      persisted.starIds,
+    )
+  }
+
+  return persisted
+}
+
+function toPersistedTagColorOverrides(value) {
+  if (value === undefined) return {}
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('Sky data contains invalid tag colour overrides.')
+  }
+
+  return Object.fromEntries(
+    Object.entries(value).map(([tag, color]) => {
+      const normalizedTag = normalizeTag(tag)
+      if (!normalizedTag || typeof color !== 'string' || !HEX_COLOR.test(color)) {
+        throw new Error('Sky data contains invalid tag colour overrides.')
+      }
+      return [normalizedTag, color.toLowerCase()]
+    }),
+  )
 }
 
 function getStorage(storage) {
@@ -86,7 +153,9 @@ function toPersistedSky(sky, schemaVersion = sky.schemaVersion) {
   assertSkyShape(sky)
 
   const stars = sky.stars.map(toPersistedStar)
-  const constellations = sky.constellations.map(toPersistedConstellation)
+  const constellations = sky.constellations.map((constellation) =>
+    toPersistedConstellation(constellation, schemaVersion),
+  )
   const starIds = new Set(stars.map((star) => star.id))
   const constellationIds = new Set(constellations.map((constellation) => constellation.id))
 
@@ -103,19 +172,51 @@ function toPersistedSky(sky, schemaVersion = sky.schemaVersion) {
     throw new Error('Sky data contains invalid constellation stars.')
   }
 
-  return {
+  if (schemaVersion >= 2) {
+    const starsById = new Map(stars.map((star) => [star.id, star]))
+
+    for (const constellation of constellations) {
+      for (const [key, tag] of Object.entries(constellation.edgeTagOverrides)) {
+        const edgeIndex = constellation.starIds.findIndex(
+          (starId, index) =>
+            constellation.starIds[index + 1] &&
+            edgeKey(starId, constellation.starIds[index + 1]) === key,
+        )
+        const firstStar = starsById.get(constellation.starIds[edgeIndex])
+        const secondStar = starsById.get(constellation.starIds[edgeIndex + 1])
+        const firstTags = new Set(firstStar.tags.map(normalizeTag))
+        const secondTags = new Set(secondStar.tags.map(normalizeTag))
+
+        if (!firstTags.has(tag) || !secondTags.has(tag)) {
+          throw new Error('Sky data contains a connection tag that its stars do not share.')
+        }
+      }
+    }
+  }
+
+  const persisted = {
     schemaVersion,
     stars,
     constellations,
   }
+
+  if (schemaVersion >= 2) {
+    persisted.tagColorOverrides = toPersistedTagColorOverrides(sky.tagColorOverrides)
+  }
+
+  return persisted
 }
 
 export function createEmptySky(schemaVersion = CURRENT_SCHEMA_VERSION) {
-  return {
+  const sky = {
     schemaVersion,
     stars: [],
     constellations: [],
   }
+
+  if (schemaVersion >= 2) sky.tagColorOverrides = {}
+
+  return sky
 }
 
 export function migrateSky(
@@ -157,9 +258,12 @@ export function migrateSky(
 
 export function serializeSky(
   sky,
-  { currentVersion = CURRENT_SCHEMA_VERSION } = {},
+  {
+    currentVersion = CURRENT_SCHEMA_VERSION,
+    migrations = MIGRATIONS,
+  } = {},
 ) {
-  return JSON.stringify(toPersistedSky(sky, currentVersion))
+  return JSON.stringify(migrateSky(sky, { currentVersion, migrations }))
 }
 
 export function deserializeSky(
@@ -204,10 +308,11 @@ export function saveSky(
     storage,
     key = STORAGE_KEY,
     currentVersion = CURRENT_SCHEMA_VERSION,
+    migrations = MIGRATIONS,
   } = {},
 ) {
   const target = getStorage(storage)
-  const persisted = toPersistedSky(sky, currentVersion)
+  const persisted = migrateSky(sky, { currentVersion, migrations })
 
   if (!target) throw new Error('localStorage is unavailable.')
   target.setItem(key, JSON.stringify(persisted))

@@ -1,7 +1,7 @@
 import React from 'react'
 import { useRef, useState } from 'react'
 
-import { getTagColor, normalizeTags } from '../lib/suggestions.js'
+import { normalizeTags } from '../lib/suggestions.js'
 
 function hashString(value) {
   let hash = 0
@@ -9,7 +9,14 @@ function hashString(value) {
   return hash
 }
 
-export default function Star({ star, isSelected, isConnectionOrigin, onMove, onSelect }) {
+export default function Star({
+  star,
+  tagColors,
+  isSelected,
+  isConnectionOrigin,
+  onMove,
+  onSelect,
+}) {
   const activePointer = useRef(null)
   const movedDuringGesture = useRef(false)
   const [isDragging, setIsDragging] = useState(false)
@@ -18,7 +25,7 @@ export default function Star({ star, isSelected, isConnectionOrigin, onMove, onS
   const recencyGlow = Math.max(0, 1 - ageInDays / 30)
   const radius = 3.4 + recencyGlow * 1.2
   const visibleTags = normalizeTags(star.tags).slice(0, 3)
-  const primaryTagColor = visibleTags.length > 0 ? getTagColor(visibleTags[0]) : '#fff4cf'
+  const primaryTagColor = tagColors[visibleTags[0]] ?? '#fff4cf'
 
   function handlePointerDown(event) {
     if (event.button !== 0) return
@@ -96,7 +103,7 @@ export default function Star({ star, isSelected, isConnectionOrigin, onMove, onS
           cx={`${star.x * 100}%`}
           cy={`${star.y * 100}%`}
           r={radius * (2.1 + index * 0.7)}
-          style={{ '--tag-color': getTagColor(tag) }}
+          style={{ '--tag-color': tagColors[tag] }}
         >
           <title>{tag}</title>
         </circle>
