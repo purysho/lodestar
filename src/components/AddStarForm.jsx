@@ -1,5 +1,5 @@
 import React from 'react'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 const EMPTY_FORM = {
   title: '',
@@ -10,6 +10,39 @@ const EMPTY_FORM = {
 
 export default function AddStarForm({ onCancel, onSave }) {
   const [form, setForm] = useState(EMPTY_FORM)
+  const dialogRef = useRef(null)
+
+  useEffect(() => {
+    function handleKeyDown(event) {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        onCancel()
+        return
+      }
+
+      if (event.key !== 'Tab') return
+
+      const focusableElements = dialogRef.current?.querySelectorAll(
+        'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      )
+      const focusable = Array.from(focusableElements ?? [])
+      if (focusable.length === 0) return
+
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault()
+        first.focus()
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [onCancel])
 
   function updateField(event) {
     const { name, value } = event.target
@@ -38,6 +71,7 @@ export default function AddStarForm({ onCancel, onSave }) {
       role="presentation"
     >
       <section
+        ref={dialogRef}
         className="w-full max-w-md rounded-2xl border border-white/10 bg-night-900/95 p-6 shadow-2xl shadow-black/40"
         role="dialog"
         aria-labelledby="add-star-title"

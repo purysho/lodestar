@@ -15,6 +15,7 @@ export default function Star({
   hiddenTagIds,
   isSelected,
   isConnectionOrigin,
+  isDimmed,
   onMove,
   onSelect,
 }) {
@@ -81,6 +82,7 @@ export default function Star({
       aria-pressed={isSelected}
       data-primary-tag={visibleTags[0] ?? 'neutral'}
       data-connection-origin={isConnectionOrigin ? 'true' : 'false'}
+      data-filtered-out={isDimmed ? 'true' : 'false'}
       style={{
         '--star-tag-color': primaryTagColor,
         '--twinkle-delay': `${-(hash % 37) / 10}s`,
