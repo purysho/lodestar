@@ -12,7 +12,7 @@ function hashString(value) {
 export default function Star({
   star,
   tagColors,
-  colorsVisible,
+  hiddenTagIds,
   isSelected,
   isConnectionOrigin,
   onMove,
@@ -25,7 +25,9 @@ export default function Star({
   const ageInDays = Math.max(0, (Date.now() - Date.parse(star.createdAt)) / 86_400_000)
   const recencyGlow = Math.max(0, 1 - ageInDays / 30)
   const radius = 3.4 + recencyGlow * 1.2
-  const visibleTags = normalizeTags(star.tags).slice(0, 3)
+  const visibleTags = normalizeTags(star.tags)
+    .filter((tag) => !hiddenTagIds.has(tag))
+    .slice(0, 3)
   const primaryTagColor = tagColors[visibleTags[0]] ?? '#fff4cf'
 
   function handlePointerDown(event) {
@@ -77,7 +79,7 @@ export default function Star({
       tabIndex="0"
       aria-label={`${star.title}. Star in your sky.`}
       aria-pressed={isSelected}
-      data-tag-colors={colorsVisible ? 'visible' : 'hidden'}
+      data-primary-tag={visibleTags[0] ?? 'neutral'}
       data-connection-origin={isConnectionOrigin ? 'true' : 'false'}
       style={{
         '--star-tag-color': primaryTagColor,
@@ -98,20 +100,18 @@ export default function Star({
         cy={`${star.y * 100}%`}
         r={radius * 3.8}
       />
-      {colorsVisible
-        ? visibleTags.map((tag, index) => (
-            <circle
-              key={tag}
-              className="star-tag-ring"
-              cx={`${star.x * 100}%`}
-              cy={`${star.y * 100}%`}
-              r={radius * (2.1 + index * 0.7)}
-              style={{ '--tag-color': tagColors[tag] }}
-            >
-              <title>{tag}</title>
-            </circle>
-          ))
-        : null}
+      {visibleTags.map((tag, index) => (
+        <circle
+          key={tag}
+          className="star-tag-ring"
+          cx={`${star.x * 100}%`}
+          cy={`${star.y * 100}%`}
+          r={radius * (2.1 + index * 0.7)}
+          style={{ '--tag-color': tagColors[tag] }}
+        >
+          <title>{tag}</title>
+        </circle>
+      ))}
       <circle
         className="star-core"
         cx={`${star.x * 100}%`}
