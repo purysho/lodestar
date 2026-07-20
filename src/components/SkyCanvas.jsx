@@ -28,10 +28,11 @@ export default function SkyCanvas({
   const connectionOrigin = stars.find((star) => star.id === connectionDraft?.fromStarId)
   const starsById = new Map(stars.map((star) => [star.id, star]))
   const suggestionStars = selectedSuggestion?.starIds.map((starId) => starsById.get(starId))
+  const skyLabel = `${stars.length} ${stars.length === 1 ? 'star' : 'stars'} in your sky`
 
   return (
     <section className="absolute inset-0 z-10" aria-label="Your sky">
-      <svg className="h-full w-full" role="group" aria-label={`${stars.length} stars in your sky`}>
+      <svg className="h-full w-full" role="group" aria-label={skyLabel}>
         <ConstellationLayer
           constellations={constellations}
           stars={stars}

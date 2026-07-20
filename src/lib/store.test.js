@@ -2,6 +2,8 @@ import { describe, expect, it, vi } from 'vitest'
 
 import {
   createEmptySky,
+  decodeSky,
+  encodeSky,
   exportSky,
   importSky,
   loadSky,
@@ -107,6 +109,35 @@ describe('the Lodestar store', () => {
     const sky = createSky()
 
     expect(importSky(exportSky(sky))).toEqual(sky)
+  })
+
+  it('round-trips a Unicode sky through the share-link encoding', () => {
+    const sky = createSky()
+    sky.stars[0].title = 'A light beyond the horizon ✦'
+
+    expect(decodeSky(encodeSky(sky))).toEqual(sky)
+  })
+
+  it('directs oversized share links to file export', () => {
+    expect(() => encodeSky(createSky(), { maxLength: 8 })).toThrow(
+      'Export a JSON file instead.',
+    )
+  })
+
+  it('rejects malformed share-link data gracefully', () => {
+    expect(() => decodeSky('not-a-valid-sky')).toThrow('shared sky link is invalid')
+  })
+
+  it('rejects imports with malformed nested records', () => {
+    expect(() =>
+      importSky(
+        JSON.stringify({
+          schemaVersion: 1,
+          stars: [{ id: 'broken', title: 'Broken', x: 'far away', y: 0.5 }],
+          constellations: [],
+        }),
+      ),
+    ).toThrow('invalid star coordinates')
   })
 
   it('persists only stars and user-drawn constellations, never suggestions', () => {

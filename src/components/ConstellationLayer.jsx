@@ -44,10 +44,12 @@ export default function ConstellationLayer({
   onSelectSuggestion,
 }) {
   const starsById = new Map(stars.map((star) => [star.id, star]))
+  const constellationLabel = `${constellations.length} authored ${constellations.length === 1 ? 'constellation' : 'constellations'}`
+  const suggestionLabel = `${suggestions.length} suggested ${suggestions.length === 1 ? 'connection' : 'connections'}`
 
   return (
     <>
-      <g aria-label={`${constellations.length} authored constellations`}>
+      <g aria-label={constellationLabel}>
         {constellations.flatMap((constellation) =>
           constellation.starIds.slice(1).map((starId, index) => {
             const from = starsById.get(constellation.starIds[index])
@@ -69,7 +71,7 @@ export default function ConstellationLayer({
           }),
         )}
       </g>
-      <g aria-label={`${suggestions.length} suggested connections`}>
+      <g aria-label={suggestionLabel}>
         {suggestions.map((suggestion) => {
           const from = starsById.get(suggestion.starIds[0])
           const to = starsById.get(suggestion.starIds[1])

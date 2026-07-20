@@ -4,7 +4,15 @@ import { useMemo, useState } from 'react'
 import AddStarForm from './components/AddStarForm.jsx'
 import SkyCanvas from './components/SkyCanvas.jsx'
 import SkyToolbar from './components/SkyToolbar.jsx'
-import { loadSky, saveSky } from './lib/store.js'
+import {
+  decodeSky,
+  encodeSky,
+  exportSky,
+  importSky,
+  loadSky,
+  MAX_SHARE_URL_LENGTH,
+  saveSky,
+} from './lib/store.js'
 import { deriveSuggestions } from './lib/suggestions.js'
 
 function createId(prefix) {
@@ -57,6 +65,25 @@ function removeEdgeFromConstellation(constellation, firstStarId, secondStarId) {
   ])
 }
 
+function readSharedSkyFromUrl() {
+  if (typeof globalThis.location === 'undefined') return { sky: null, error: null }
+
+  const encoded = new URLSearchParams(globalThis.location.hash.slice(1)).get('sky')
+  if (!encoded) return { sky: null, error: null }
+
+  try {
+    return { sky: decodeSky(encoded), error: null }
+  } catch (error) {
+    return { sky: null, error: error.message }
+  }
+}
+
+function clearShareHash() {
+  if (typeof globalThis.history === 'undefined') return
+  const cleanUrl = `${globalThis.location.pathname}${globalThis.location.search}`
+  globalThis.history.replaceState(null, '', cleanUrl)
+}
+
 export default function App() {
   const [sky, setSky] = useState(() => loadSky())
   const [isAddingStar, setIsAddingStar] = useState(false)
@@ -65,6 +92,9 @@ export default function App() {
   const [suggestionsVisible, setSuggestionsVisible] = useState(true)
   const [dismissedSuggestionIds, setDismissedSuggestionIds] = useState(() => new Set())
   const [selectedSuggestionId, setSelectedSuggestionId] = useState(null)
+  const [sharedSky, setSharedSky] = useState(readSharedSkyFromUrl)
+  const [shareUrl, setShareUrl] = useState('')
+  const [notice, setNotice] = useState('')
 
   const selectedStar = sky.stars.find((star) => star.id === selectedStarId) ?? null
   const suggestions = useMemo(
@@ -267,9 +297,83 @@ export default function App() {
     setSelectedSuggestionId(null)
   }
 
+  function replaceSky(nextSky, message) {
+    setSky(saveSky(nextSky))
+    setConnectionDraft(null)
+    setSelectedStarId(null)
+    setSelectedSuggestionId(null)
+    setDismissedSuggestionIds(new Set())
+    setShareUrl('')
+    setNotice(message)
+  }
+
+  function handleExport() {
+    const blob = new Blob([exportSky(sky)], { type: 'application/json' })
+    const objectUrl = URL.createObjectURL(blob)
+    const download = document.createElement('a')
+    download.href = objectUrl
+    download.download = `lodestar-sky-${new Date().toISOString().slice(0, 10)}.json`
+    download.hidden = true
+    document.body.append(download)
+    download.click()
+    download.remove()
+    globalThis.setTimeout(() => URL.revokeObjectURL(objectUrl), 0)
+    setNotice('Your sky was exported as JSON.')
+  }
+
+  async function handleImportFile(file) {
+    if (!file) return
+
+    const confirmed = globalThis.confirm(
+      'Importing replaces the sky currently saved in this browser. Continue?',
+    )
+    if (!confirmed) return
+
+    try {
+      replaceSky(importSky(await file.text()), 'Imported sky saved in this browser.')
+    } catch (error) {
+      setNotice(error.message)
+    }
+  }
+
+  function handleCreateShareLink() {
+    try {
+      const baseUrl = `${globalThis.location.origin}${globalThis.location.pathname}${globalThis.location.search}`
+      const prefix = `${baseUrl}#sky=`
+      const encoded = encodeSky(sky, {
+        maxLength: Math.max(1, MAX_SHARE_URL_LENGTH - prefix.length),
+      })
+      setShareUrl(`${prefix}${encoded}`)
+      setNotice('Share link ready. It imports only after the recipient confirms.')
+    } catch (error) {
+      setShareUrl('')
+      setNotice(error.message)
+    }
+  }
+
+  async function handleCopyShareLink() {
+    try {
+      await globalThis.navigator.clipboard.writeText(shareUrl)
+      setNotice('Share link copied.')
+    } catch {
+      setNotice('Copy was unavailable. Select the link and copy it manually.')
+    }
+  }
+
+  function handleApplySharedSky() {
+    replaceSky(sharedSky.sky, 'Shared sky imported into this browser.')
+    setSharedSky({ sky: null, error: null })
+    clearShareHash()
+  }
+
+  function handleDismissSharedSky() {
+    setSharedSky({ sky: null, error: null })
+    clearShareHash()
+  }
+
   return (
     <main className="sky-shell relative min-h-screen overflow-hidden bg-night-950 text-white">
-      <header className="relative z-20 flex items-center justify-between px-6 py-6 sm:px-10">
+      <header className="relative z-20 flex flex-wrap items-center justify-between gap-4 px-5 py-5 sm:px-10 sm:py-6">
         <a
           className="font-display text-xl tracking-[0.18em] text-starlight"
           href="./"
@@ -277,7 +381,7 @@ export default function App() {
         >
           Lodestar
         </a>
-        <div className="flex items-center gap-5">
+        <div className="flex min-w-0 flex-1 items-center justify-end gap-5">
           <p className="hidden text-xs tracking-[0.16em] text-slate-400 sm:block">
             A sky that remembers
           </p>
@@ -285,6 +389,9 @@ export default function App() {
             suggestionCount={suggestions.length}
             suggestionsVisible={suggestionsVisible}
             onAddStar={() => setIsAddingStar(true)}
+            onExport={handleExport}
+            onImportFile={handleImportFile}
+            onShare={handleCreateShareLink}
             onToggleSuggestions={() => {
               setSuggestionsVisible((visible) => !visible)
               setSelectedSuggestionId(null)
@@ -317,6 +424,93 @@ export default function App() {
 
       {isAddingStar ? (
         <AddStarForm onCancel={() => setIsAddingStar(false)} onSave={handleAddStar} />
+      ) : null}
+
+      {shareUrl ? (
+        <section
+          className="absolute right-4 top-28 z-30 w-[calc(100%-2rem)] max-w-lg rounded-2xl border border-white/10 bg-night-900/95 p-5 shadow-2xl shadow-black/40 backdrop-blur-md sm:right-8 sm:top-24"
+          aria-labelledby="share-sky-title"
+        >
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h2 id="share-sky-title" className="font-display text-xl text-starlight">
+                Carry this sky elsewhere
+              </h2>
+              <p className="mt-1 text-sm text-slate-400">
+                Opening the link asks before replacing any saved sky.
+              </p>
+            </div>
+            <button
+              className="rounded-full px-2 py-1 text-lg text-slate-500 transition hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-aurora"
+              type="button"
+              aria-label="Close share link"
+              onClick={() => setShareUrl('')}
+            >
+              ×
+            </button>
+          </div>
+          <label className="mt-4 block text-xs uppercase tracking-[0.14em] text-slate-500">
+            Shareable link
+            <input
+              className="mt-2 w-full rounded-xl border border-white/10 bg-night-950/70 px-3 py-3 text-sm text-slate-300 outline-none focus:border-aurora focus:ring-2 focus:ring-aurora/25"
+              readOnly
+              value={shareUrl}
+              onFocus={(event) => event.currentTarget.select()}
+            />
+          </label>
+          <div className="mt-4 flex justify-end">
+            <button
+              className="rounded-full bg-starlight px-4 py-2 text-sm font-semibold text-night-950 transition hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-aurora"
+              type="button"
+              onClick={handleCopyShareLink}
+            >
+              Copy link
+            </button>
+          </div>
+        </section>
+      ) : null}
+
+      {sharedSky.sky || sharedSky.error ? (
+        <section
+          className="absolute left-1/2 top-28 z-30 w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 rounded-2xl border border-aurora/20 bg-night-900/95 p-5 text-center shadow-2xl shadow-black/40 backdrop-blur-md sm:top-24"
+          aria-labelledby="shared-sky-title"
+        >
+          <h2 id="shared-sky-title" className="font-display text-xl text-starlight">
+            {sharedSky.sky ? 'A shared sky is waiting' : 'This shared sky could not be read'}
+          </h2>
+          <p className="mt-2 text-sm leading-6 text-slate-400">
+            {sharedSky.sky
+              ? 'Importing replaces the sky currently saved in this browser.'
+              : sharedSky.error}
+          </p>
+          <div className="mt-4 flex justify-center gap-3">
+            <button
+              className="rounded-full px-4 py-2 text-sm text-slate-400 transition hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-aurora"
+              type="button"
+              onClick={handleDismissSharedSky}
+            >
+              {sharedSky.sky ? 'Keep my sky' : 'Dismiss'}
+            </button>
+            {sharedSky.sky ? (
+              <button
+                className="rounded-full bg-starlight px-4 py-2 text-sm font-semibold text-night-950 transition hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-aurora"
+                type="button"
+                onClick={handleApplySharedSky}
+              >
+                Import shared sky
+              </button>
+            ) : null}
+          </div>
+        </section>
+      ) : null}
+
+      {notice ? (
+        <div
+          className="absolute bottom-4 left-1/2 z-50 max-w-[calc(100%-2rem)] -translate-x-1/2 rounded-full border border-white/10 bg-night-900/95 px-4 py-2 text-center text-sm text-slate-300 shadow-xl shadow-black/30"
+          role="status"
+        >
+          {notice}
+        </div>
       ) : null}
     </main>
   )

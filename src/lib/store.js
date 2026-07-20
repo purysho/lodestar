@@ -1,25 +1,67 @@
 export const STORAGE_KEY = 'lodestar:sky'
 export const CURRENT_SCHEMA_VERSION = 1
+export const MAX_SHARE_URL_LENGTH = 8_000
 
 // Add migrations as the schema grows: key N migrates version N to N + 1.
 export const MIGRATIONS = Object.freeze({})
 
-const STAR_FIELDS = [
-  'id',
-  'title',
-  'note',
-  'tags',
-  'url',
-  'x',
-  'y',
-  'origin',
-  'createdAt',
-]
+function requireNonEmptyString(value, field) {
+  if (typeof value !== 'string' || !value.trim()) {
+    throw new Error(`Sky data has an invalid ${field}.`)
+  }
+  return value
+}
 
-const CONSTELLATION_FIELDS = ['id', 'name', 'starIds', 'createdAt']
+function toPersistedStar(star) {
+  if (!star || typeof star !== 'object' || Array.isArray(star)) {
+    throw new Error('Sky data contains an invalid star.')
+  }
+  if (!Number.isFinite(star.x) || !Number.isFinite(star.y)) {
+    throw new Error('Sky data contains invalid star coordinates.')
+  }
+  if (star.x < 0 || star.x > 1 || star.y < 0 || star.y > 1) {
+    throw new Error('Sky data contains star coordinates outside the sky.')
+  }
+  if (star.tags !== undefined && !Array.isArray(star.tags)) {
+    throw new Error('Sky data contains invalid star tags.')
+  }
+  if (star.tags?.some((tag) => typeof tag !== 'string')) {
+    throw new Error('Sky data contains invalid star tags.')
+  }
 
-function cloneAllowedFields(value, fields) {
-  return Object.fromEntries(fields.map((field) => [field, structuredClone(value[field])]))
+  return {
+    id: requireNonEmptyString(star.id, 'star id'),
+    title: requireNonEmptyString(star.title, 'star title'),
+    note: typeof star.note === 'string' ? star.note : '',
+    tags: structuredClone(star.tags ?? []),
+    url: typeof star.url === 'string' ? star.url : '',
+    x: star.x,
+    y: star.y,
+    origin: requireNonEmptyString(star.origin, 'star origin'),
+    createdAt: requireNonEmptyString(star.createdAt, 'star creation date'),
+  }
+}
+
+function toPersistedConstellation(constellation) {
+  if (!constellation || typeof constellation !== 'object' || Array.isArray(constellation)) {
+    throw new Error('Sky data contains an invalid constellation.')
+  }
+  if (
+    !Array.isArray(constellation.starIds) ||
+    constellation.starIds.some((starId) => typeof starId !== 'string' || !starId.trim())
+  ) {
+    throw new Error('Sky data contains invalid constellation stars.')
+  }
+
+  return {
+    id: requireNonEmptyString(constellation.id, 'constellation id'),
+    name: typeof constellation.name === 'string' ? constellation.name : '',
+    starIds: structuredClone(constellation.starIds),
+    createdAt: requireNonEmptyString(
+      constellation.createdAt,
+      'constellation creation date',
+    ),
+  }
 }
 
 function getStorage(storage) {
@@ -43,12 +85,28 @@ function assertSkyShape(value) {
 function toPersistedSky(sky, schemaVersion = sky.schemaVersion) {
   assertSkyShape(sky)
 
+  const stars = sky.stars.map(toPersistedStar)
+  const constellations = sky.constellations.map(toPersistedConstellation)
+  const starIds = new Set(stars.map((star) => star.id))
+  const constellationIds = new Set(constellations.map((constellation) => constellation.id))
+
+  if (starIds.size !== stars.length || constellationIds.size !== constellations.length) {
+    throw new Error('Sky data contains duplicate ids.')
+  }
+  if (
+    constellations.some(
+      (constellation) =>
+        new Set(constellation.starIds).size !== constellation.starIds.length ||
+        constellation.starIds.some((starId) => !starIds.has(starId)),
+    )
+  ) {
+    throw new Error('Sky data contains invalid constellation stars.')
+  }
+
   return {
     schemaVersion,
-    stars: sky.stars.map((star) => cloneAllowedFields(star, STAR_FIELDS)),
-    constellations: sky.constellations.map((constellation) =>
-      cloneAllowedFields(constellation, CONSTELLATION_FIELDS),
-    ),
+    stars,
+    constellations,
   }
 }
 
@@ -163,4 +221,64 @@ export function exportSky(sky, options) {
 
 export function importSky(serialized, options) {
   return deserializeSky(serialized, options)
+}
+
+function toBase64Url(value) {
+  const bytes = new TextEncoder().encode(value)
+  let binary = ''
+
+  for (const byte of bytes) binary += String.fromCharCode(byte)
+
+  return globalThis
+    .btoa(binary)
+    .replaceAll('+', '-')
+    .replaceAll('/', '_')
+    .replace(/=+$/u, '')
+}
+
+function fromBase64Url(value) {
+  if (!value || !/^[A-Za-z0-9_-]+$/u.test(value)) {
+    throw new Error('The shared sky link is invalid.')
+  }
+
+  const base64 = value.replaceAll('-', '+').replaceAll('_', '/')
+  const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, '=')
+
+  try {
+    const binary = globalThis.atob(padded)
+    const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0))
+    return new TextDecoder().decode(bytes)
+  } catch {
+    throw new Error('The shared sky link is invalid.')
+  }
+}
+
+export function encodeSky(
+  sky,
+  {
+    maxLength = MAX_SHARE_URL_LENGTH,
+    currentVersion = CURRENT_SCHEMA_VERSION,
+  } = {},
+) {
+  const encoded = toBase64Url(serializeSky(sky, { currentVersion }))
+
+  if (encoded.length > maxLength) {
+    throw new Error('This sky is too large for a share link. Export a JSON file instead.')
+  }
+
+  return encoded
+}
+
+export function decodeSky(
+  encoded,
+  {
+    currentVersion = CURRENT_SCHEMA_VERSION,
+    migrations = MIGRATIONS,
+  } = {},
+) {
+  try {
+    return deserializeSky(fromBase64Url(encoded), { currentVersion, migrations })
+  } catch {
+    throw new Error('The shared sky link is invalid.')
+  }
 }
