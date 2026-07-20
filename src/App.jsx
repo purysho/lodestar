@@ -20,10 +20,46 @@ function positionForStar(index) {
   }
 }
 
+function splitConstellation(constellation, segments) {
+  const viableSegments = segments.filter((starIds) => starIds.length >= 2)
+
+  return viableSegments.map((starIds, index) => ({
+    ...constellation,
+    id: index === 0 ? constellation.id : createId('con'),
+    starIds,
+  }))
+}
+
+function removeStarFromConstellation(constellation, starId) {
+  const index = constellation.starIds.indexOf(starId)
+  if (index === -1) return [constellation]
+
+  return splitConstellation(constellation, [
+    constellation.starIds.slice(0, index),
+    constellation.starIds.slice(index + 1),
+  ])
+}
+
+function removeEdgeFromConstellation(constellation, firstStarId, secondStarId) {
+  const firstIndex = constellation.starIds.findIndex(
+    (starId, index) =>
+      (starId === firstStarId && constellation.starIds[index + 1] === secondStarId) ||
+      (starId === secondStarId && constellation.starIds[index + 1] === firstStarId),
+  )
+
+  if (firstIndex === -1) return [constellation]
+
+  return splitConstellation(constellation, [
+    constellation.starIds.slice(0, firstIndex + 1),
+    constellation.starIds.slice(firstIndex + 1),
+  ])
+}
+
 export default function App() {
   const [sky, setSky] = useState(() => loadSky())
   const [isAddingStar, setIsAddingStar] = useState(false)
   const [selectedStarId, setSelectedStarId] = useState(null)
+  const [connectionDraft, setConnectionDraft] = useState(null)
 
   const selectedStar = sky.stars.find((star) => star.id === selectedStarId) ?? null
 
@@ -65,15 +101,121 @@ export default function App() {
       saveSky({
         ...currentSky,
         stars: currentSky.stars.filter((star) => star.id !== starId),
-        constellations: currentSky.constellations
-          .map((constellation) => ({
-            ...constellation,
-            starIds: constellation.starIds.filter((id) => id !== starId),
-          }))
-          .filter((constellation) => constellation.starIds.length > 0),
+        constellations: currentSky.constellations.flatMap((constellation) =>
+          removeStarFromConstellation(constellation, starId),
+        ),
       }),
     )
     setSelectedStarId(null)
+  }
+
+  function handleStartConnection(starId, constellationId = null) {
+    // Click-click keeps drawing distinct from dragging and preserves keyboard parity.
+    setConnectionDraft({ fromStarId: starId, constellationId })
+    setSelectedStarId(null)
+  }
+
+  function handleSelectStar(starId) {
+    if (!connectionDraft) {
+      setSelectedStarId(starId)
+      return
+    }
+
+    if (starId === connectionDraft.fromStarId) return
+
+    setSky((currentSky) => {
+      if (connectionDraft.constellationId) {
+        const constellation = currentSky.constellations.find(
+          (candidate) => candidate.id === connectionDraft.constellationId,
+        )
+
+        if (!constellation || constellation.starIds.includes(starId)) return currentSky
+
+        const isFirst = constellation.starIds[0] === connectionDraft.fromStarId
+        const isLast =
+          constellation.starIds[constellation.starIds.length - 1] ===
+          connectionDraft.fromStarId
+
+        if (!isFirst && !isLast) return currentSky
+
+        return saveSky({
+          ...currentSky,
+          constellations: currentSky.constellations.map((candidate) =>
+            candidate.id === constellation.id
+              ? {
+                  ...candidate,
+                  starIds: isFirst
+                    ? [starId, ...candidate.starIds]
+                    : [...candidate.starIds, starId],
+                }
+              : candidate,
+          ),
+        })
+      }
+
+      const pairAlreadyExists = currentSky.constellations.some((constellation) =>
+        constellation.starIds.some(
+          (candidateId, index) =>
+            (candidateId === connectionDraft.fromStarId &&
+              constellation.starIds[index + 1] === starId) ||
+            (candidateId === starId &&
+              constellation.starIds[index + 1] === connectionDraft.fromStarId),
+        ),
+      )
+
+      if (pairAlreadyExists) return currentSky
+
+      return saveSky({
+        ...currentSky,
+        constellations: [
+          ...currentSky.constellations,
+          {
+            id: createId('con'),
+            name: '',
+            starIds: [connectionDraft.fromStarId, starId],
+            createdAt: new Date().toISOString(),
+          },
+        ],
+      })
+    })
+
+    setConnectionDraft(null)
+    setSelectedStarId(starId)
+  }
+
+  function handleRenameConstellation(constellationId, name) {
+    setSky((currentSky) =>
+      saveSky({
+        ...currentSky,
+        constellations: currentSky.constellations.map((constellation) =>
+          constellation.id === constellationId ? { ...constellation, name } : constellation,
+        ),
+      }),
+    )
+  }
+
+  function handleDisconnectStars(constellationId, firstStarId, secondStarId) {
+    setSky((currentSky) =>
+      saveSky({
+        ...currentSky,
+        constellations: currentSky.constellations.flatMap((constellation) =>
+          constellation.id === constellationId
+            ? removeEdgeFromConstellation(constellation, firstStarId, secondStarId)
+            : [constellation],
+        ),
+      }),
+    )
+  }
+
+  function handleDeleteConstellation(constellationId) {
+    setSky((currentSky) =>
+      saveSky({
+        ...currentSky,
+        constellations: currentSky.constellations.filter(
+          (constellation) => constellation.id !== constellationId,
+        ),
+      }),
+    )
   }
 
   return (
@@ -101,12 +243,19 @@ export default function App() {
       </header>
 
       <SkyCanvas
+        connectionDraft={connectionDraft}
+        constellations={sky.constellations}
         stars={sky.stars}
         selectedStar={selectedStar}
+        onCancelConnection={() => setConnectionDraft(null)}
         onCloseStar={() => setSelectedStarId(null)}
+        onDeleteConstellation={handleDeleteConstellation}
         onDeleteStar={handleDeleteStar}
+        onDisconnectStars={handleDisconnectStars}
         onMoveStar={handleMoveStar}
-        onSelectStar={setSelectedStarId}
+        onRenameConstellation={handleRenameConstellation}
+        onSelectStar={handleSelectStar}
+        onStartConnection={handleStartConnection}
       />
 
       {isAddingStar ? (

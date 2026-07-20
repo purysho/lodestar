@@ -7,7 +7,7 @@ function hashString(value) {
   return hash
 }
 
-export default function Star({ star, isSelected, onMove, onSelect }) {
+export default function Star({ star, isSelected, isConnectionOrigin, onMove, onSelect }) {
   const activePointer = useRef(null)
   const movedDuringGesture = useRef(false)
   const [isDragging, setIsDragging] = useState(false)
@@ -65,6 +65,7 @@ export default function Star({ star, isSelected, onMove, onSelect }) {
       tabIndex="0"
       aria-label={`${star.title}. Star in your sky.`}
       aria-pressed={isSelected}
+      data-connection-origin={isConnectionOrigin ? 'true' : 'false'}
       style={{
         '--twinkle-delay': `${-(hash % 37) / 10}s`,
         '--twinkle-duration': `${4.8 + (hash % 23) / 10}s`,

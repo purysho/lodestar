@@ -79,6 +79,24 @@ textarea {
     drop-shadow(0 0 14px rgba(159, 174, 255, 0.72));
 }
 
+.star-node[data-connection-origin='true'] .star-core {
+  fill: #ffffff;
+  filter:
+    drop-shadow(0 0 6px rgba(255, 244, 207, 1))
+    drop-shadow(0 0 18px rgba(159, 174, 255, 0.9));
+  stroke: #9faeff;
+  stroke-width: 2px;
+}
+
+.constellation-line {
+  filter: drop-shadow(0 0 3px rgba(213, 220, 255, 0.3));
+  pointer-events: none;
+  stroke: rgba(229, 233, 255, 0.72);
+  stroke-linecap: round;
+  stroke-width: 1.35px;
+  vector-effect: non-scaling-stroke;
+}
+
 @keyframes twinkle {
   0%,
   100% {
