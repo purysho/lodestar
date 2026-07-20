@@ -13,7 +13,13 @@ import {
   MAX_SHARE_URL_LENGTH,
   saveSky,
 } from './lib/store.js'
-import { deriveSuggestions } from './lib/suggestions.js'
+import {
+  deriveSuggestions,
+  deriveTagColors,
+  getEdgeKey,
+  getSharedTags,
+  normalizeTags,
+} from './lib/suggestions.js'
 
 function createId(prefix) {
   const token = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`
@@ -37,6 +43,32 @@ function splitConstellation(constellation, segments) {
     ...constellation,
     id: index === 0 ? constellation.id : createId('con'),
     starIds,
+    edgeTagOverrides: Object.fromEntries(
+      starIds.slice(1).flatMap((starId, edgeIndex) => {
+        const key = getEdgeKey(starIds[edgeIndex], starId)
+        const tag = constellation.edgeTagOverrides?.[key]
+        return tag ? [[key, tag]] : []
+      }),
+    ),
+  }))
+}
+
+function pruneConnectionMeanings(constellations, stars) {
+  const starsById = new Map(stars.map((star) => [star.id, star]))
+  const tagOrder = Object.keys(deriveTagColors(stars))
+
+  return constellations.map((constellation) => ({
+    ...constellation,
+    edgeTagOverrides: Object.fromEntries(
+      constellation.starIds.slice(1).flatMap((starId, index) => {
+        const from = starsById.get(constellation.starIds[index])
+        const to = starsById.get(starId)
+        const key = getEdgeKey(from.id, to.id)
+        const tag = constellation.edgeTagOverrides?.[key]
+
+        return tag && getSharedTags(from, to, tagOrder).includes(tag) ? [[key, tag]] : []
+      }),
+    ),
   }))
 }
 
@@ -97,6 +129,10 @@ export default function App() {
   const [notice, setNotice] = useState('')
 
   const selectedStar = sky.stars.find((star) => star.id === selectedStarId) ?? null
+  const tagColors = useMemo(
+    () => deriveTagColors(sky.stars, sky.tagColorOverrides),
+    [sky.stars, sky.tagColorOverrides],
+  )
   const suggestions = useMemo(
     () =>
       deriveSuggestions(sky.stars, sky.constellations).filter(
@@ -117,6 +153,7 @@ export default function App() {
           {
             id: createId('star'),
             ...values,
+            tags: normalizeTags(values.tags),
             ...position,
             origin: 'manual',
             createdAt: new Date().toISOString(),
@@ -218,6 +255,7 @@ export default function App() {
             name: '',
             starIds: [connectionDraft.fromStarId, starId],
             createdAt: new Date().toISOString(),
+            edgeTagOverrides: {},
           },
         ],
       })
@@ -234,6 +272,65 @@ export default function App() {
         constellations: currentSky.constellations.map((constellation) =>
           constellation.id === constellationId ? { ...constellation, name } : constellation,
         ),
+      }),
+    )
+  }
+
+  function handleUpdateStarTags(starId, tags) {
+    setSky((currentSky) => {
+      const stars = currentSky.stars.map((star) =>
+        star.id === starId ? { ...star, tags: normalizeTags(tags) } : star,
+      )
+
+      return saveSky({
+        ...currentSky,
+        stars,
+        constellations: pruneConnectionMeanings(currentSky.constellations, stars),
+      })
+    })
+    setDismissedSuggestionIds(new Set())
+  }
+
+  function handleSetTagColor(tag, color) {
+    setSky((currentSky) =>
+      saveSky({
+        ...currentSky,
+        tagColorOverrides: {
+          ...currentSky.tagColorOverrides,
+          [tag]: color,
+        },
+      }),
+    )
+  }
+
+  function handleResetTagColor(tag) {
+    setSky((currentSky) => {
+      const tagColorOverrides = { ...currentSky.tagColorOverrides }
+      delete tagColorOverrides[tag]
+
+      return saveSky({ ...currentSky, tagColorOverrides })
+    })
+  }
+
+  function handleSetConnectionMeaning(
+    constellationId,
+    firstStarId,
+    secondStarId,
+    tag,
+  ) {
+    setSky((currentSky) =>
+      saveSky({
+        ...currentSky,
+        constellations: currentSky.constellations.map((constellation) => {
+          if (constellation.id !== constellationId) return constellation
+
+          const edgeTagOverrides = { ...constellation.edgeTagOverrides }
+          const key = getEdgeKey(firstStarId, secondStarId)
+          if (tag) edgeTagOverrides[key] = tag
+          else delete edgeTagOverrides[key]
+
+          return { ...constellation, edgeTagOverrides }
+        }),
       }),
     )
   }
@@ -285,6 +382,7 @@ export default function App() {
             name: '',
             starIds: [...suggestion.starIds],
             createdAt: new Date().toISOString(),
+            edgeTagOverrides: {},
           },
         ],
       })
@@ -405,6 +503,8 @@ export default function App() {
         constellations={sky.constellations}
         selectedSuggestion={selectedSuggestion}
         stars={sky.stars}
+        tagColors={tagColors}
+        tagColorOverrides={sky.tagColorOverrides}
         suggestions={suggestionsVisible ? suggestions : []}
         selectedStar={selectedStar}
         onAcceptSuggestion={handleAcceptSuggestion}
@@ -417,9 +517,13 @@ export default function App() {
         onDisconnectStars={handleDisconnectStars}
         onMoveStar={handleMoveStar}
         onRenameConstellation={handleRenameConstellation}
+        onResetTagColor={handleResetTagColor}
         onSelectSuggestion={setSelectedSuggestionId}
         onSelectStar={handleSelectStar}
+        onSetConnectionMeaning={handleSetConnectionMeaning}
+        onSetTagColor={handleSetTagColor}
         onStartConnection={handleStartConnection}
+        onUpdateStarTags={handleUpdateStarTags}
       />
 
       {isAddingStar ? (

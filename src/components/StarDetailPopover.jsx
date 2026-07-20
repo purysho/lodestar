@@ -1,6 +1,42 @@
 import React from 'react'
+import { useState } from 'react'
 
-import { getTagColor, normalizeTags } from '../lib/suggestions.js'
+import { getEdgeKey, getSharedTags, normalizeTags } from '../lib/suggestions.js'
+
+function TagEditor({ star, onUpdate }) {
+  const [value, setValue] = useState(star.tags.join(', '))
+
+  function handleSubmit(event) {
+    event.preventDefault()
+    onUpdate(star.id, value.split(','))
+  }
+
+  return (
+    <form className="mt-4" onSubmit={handleSubmit}>
+      <label className="block text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+        Tags in colour order
+        <input
+          className="mt-2 w-full rounded-xl border border-white/10 bg-night-950/70 px-3 py-2.5 text-sm normal-case tracking-normal text-slate-200 outline-none focus:border-aurora focus:ring-2 focus:ring-aurora/25"
+          aria-describedby="tag-order-help"
+          aria-label={`Edit tags for ${star.title}`}
+          value={value}
+          onChange={(event) => setValue(event.target.value)}
+        />
+      </label>
+      <div className="mt-2 flex items-center justify-between gap-3">
+        <p id="tag-order-help" className="text-xs leading-5 text-slate-500">
+          First tag colours the star. Separate tags with commas.
+        </p>
+        <button
+          className="shrink-0 rounded-full border border-aurora/25 px-3 py-1.5 text-xs text-aurora transition hover:border-aurora focus:outline-none focus-visible:ring-2 focus-visible:ring-aurora"
+          type="submit"
+        >
+          Save tags
+        </button>
+      </div>
+    </form>
+  )
+}
 
 function getAdjacentStarIds(constellation, starId) {
   const index = constellation.starIds.indexOf(starId)
@@ -13,11 +49,14 @@ function ConstellationEditor({
   constellation,
   star,
   starsById,
+  tagColors,
   onDelete,
   onDisconnect,
   onRename,
+  onSetConnectionMeaning,
   onStartConnection,
 }) {
+  const adjacentStarIds = getAdjacentStarIds(constellation, star.id)
   const canExtend =
     constellation.starIds[0] === star.id ||
     constellation.starIds[constellation.starIds.length - 1] === star.id
@@ -32,8 +71,49 @@ function ConstellationEditor({
         onChange={(event) => onRename(constellation.id, event.target.value)}
       />
 
+      {adjacentStarIds.length > 0 ? (
+        <div className="mt-3 space-y-2">
+          {adjacentStarIds.map((adjacentStarId) => {
+            const adjacentStar = starsById.get(adjacentStarId)
+            if (!adjacentStar) return null
+            const sharedTags = getSharedTags(star, adjacentStar, Object.keys(tagColors))
+            const selectedTag =
+              constellation.edgeTagOverrides?.[getEdgeKey(star.id, adjacentStarId)] ?? ''
+
+            return (
+              <label
+                key={adjacentStarId}
+                className="block rounded-lg border border-white/10 bg-night-950/35 px-3 py-2 text-xs text-slate-400"
+              >
+                Meaning of line to {adjacentStar?.title ?? 'star'}
+                <select
+                  className="mt-2 w-full rounded-lg border border-white/10 bg-night-900 px-2 py-2 text-sm text-slate-200 outline-none focus:border-aurora focus:ring-2 focus:ring-aurora/25"
+                  aria-label={`Meaning of line from ${star.title} to ${adjacentStar?.title ?? 'star'}`}
+                  value={selectedTag}
+                  onChange={(event) =>
+                    onSetConnectionMeaning(
+                      constellation.id,
+                      star.id,
+                      adjacentStarId,
+                      event.target.value,
+                    )
+                  }
+                >
+                  <option value="">Automatic — {sharedTags[0] ?? 'neutral'}</option>
+                  {sharedTags.map((tag) => (
+                    <option key={tag} value={tag}>
+                      {tag}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )
+          })}
+        </div>
+      ) : null}
+
       <div className="mt-3 flex flex-wrap gap-2">
-        {getAdjacentStarIds(constellation, star.id).map((adjacentStarId) => (
+        {adjacentStarIds.map((adjacentStarId) => (
           <button
             key={adjacentStarId}
             className="rounded-full border border-white/10 px-3 py-1.5 text-xs text-slate-300 transition hover:border-white/25 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-aurora"
@@ -73,7 +153,10 @@ export default function StarDetailPopover({
   onDeleteConstellation,
   onDisconnect,
   onRenameConstellation,
+  onSetConnectionMeaning,
   onStartConnection,
+  onUpdateTags,
+  tagColors,
 }) {
   const starsById = new Map(stars.map((candidate) => [candidate.id, candidate]))
 
@@ -102,7 +185,7 @@ export default function StarDetailPopover({
       {star.tags.length > 0 ? (
         <div className="mt-4 flex flex-wrap gap-2" aria-label="Star tags">
           {normalizeTags(star.tags).map((tag) => {
-            const tagColor = getTagColor(tag)
+            const tagColor = tagColors[tag]
 
             return (
               <span
@@ -117,6 +200,8 @@ export default function StarDetailPopover({
           })}
         </div>
       ) : null}
+
+      <TagEditor key={star.id} star={star} onUpdate={onUpdateTags} />
 
       <div className="mt-5 border-t border-white/10 pt-4">
         <div className="flex items-center justify-between gap-4">
@@ -140,9 +225,11 @@ export default function StarDetailPopover({
                 constellation={constellation}
                 star={star}
                 starsById={starsById}
+                tagColors={tagColors}
                 onDelete={onDeleteConstellation}
                 onDisconnect={onDisconnect}
                 onRename={onRenameConstellation}
+                onSetConnectionMeaning={onSetConnectionMeaning}
                 onStartConnection={onStartConnection}
               />
             ))}

@@ -1,8 +1,8 @@
 import React from 'react'
 
-import { getSharedTags, getTagColor } from '../lib/suggestions.js'
+import { getEdgeKey, getSharedTags } from '../lib/suggestions.js'
 
-function SuggestedLine({ suggestion, from, to, onSelect }) {
+function SuggestedLine({ suggestion, from, to, tagColors, onSelect }) {
   function handleKeyDown(event) {
     if (event.key !== 'Enter' && event.key !== ' ') return
     event.preventDefault()
@@ -17,7 +17,8 @@ function SuggestedLine({ suggestion, from, to, onSelect }) {
       role="button"
       tabIndex="0"
       aria-label={label}
-      style={{ '--link-color': getTagColor(suggestion.sharedTags[0]) }}
+      data-link-tag={suggestion.sharedTags[0]}
+      style={{ '--link-color': tagColors[suggestion.sharedTags[0]] }}
       onClick={() => onSelect(suggestion.id)}
       onKeyDown={handleKeyDown}
     >
@@ -44,6 +45,7 @@ export default function ConstellationLayer({
   constellations,
   stars,
   suggestions,
+  tagColors,
   onSelectSuggestion,
 }) {
   const starsById = new Map(stars.map((star) => [star.id, star]))
@@ -58,23 +60,25 @@ export default function ConstellationLayer({
             const from = starsById.get(constellation.starIds[index])
             const to = starsById.get(starId)
             if (!from || !to) return null
-            const sharedTags = getSharedTags(from, to)
+            const sharedTags = getSharedTags(from, to, Object.keys(tagColors))
+            const edgeTag = constellation.edgeTagOverrides?.[getEdgeKey(from.id, to.id)]
+            const linkTag = edgeTag ?? sharedTags[0]
 
             return (
               <line
                 key={`${constellation.id}:${from.id}:${to.id}`}
                 className="constellation-line"
-                style={
-                  sharedTags.length > 0
-                    ? { '--link-color': getTagColor(sharedTags[0]) }
-                    : undefined
-                }
+                data-link-tag={linkTag ?? 'neutral'}
+                style={linkTag ? { '--link-color': tagColors[linkTag] } : undefined}
                 x1={`${from.x * 100}%`}
                 y1={`${from.y * 100}%`}
                 x2={`${to.x * 100}%`}
                 y2={`${to.y * 100}%`}
               >
-                <title>{constellation.name || 'Untitled constellation'}</title>
+                <title>
+                  {constellation.name || 'Untitled constellation'}
+                  {linkTag ? ` · ${linkTag}` : ''}
+                </title>
               </line>
             )
           }),
@@ -91,6 +95,7 @@ export default function ConstellationLayer({
               key={suggestion.id}
               suggestion={suggestion}
               from={from}
+              tagColors={tagColors}
               to={to}
               onSelect={onSelectSuggestion}
             />
