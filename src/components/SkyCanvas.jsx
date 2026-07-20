@@ -58,6 +58,7 @@ export default function SkyCanvas({
   stars,
   constellations,
   suggestions,
+  colorsVisible,
   tagColors,
   tagColorOverrides,
   selectedStar,
@@ -103,6 +104,7 @@ export default function SkyCanvas({
             isSelected={star.id === selectedStar?.id}
             star={star}
             tagColors={tagColors}
+            colorsVisible={colorsVisible}
             onMove={onMoveStar}
             onSelect={onSelectStar}
           />
@@ -126,12 +128,14 @@ export default function SkyCanvas({
         </div>
       ) : null}
 
-      <TagColourKey
-        tagColors={tagColors}
-        tagColorOverrides={tagColorOverrides}
-        onResetTagColor={onResetTagColor}
-        onSetTagColor={onSetTagColor}
-      />
+      {colorsVisible ? (
+        <TagColourKey
+          tagColors={tagColors}
+          tagColorOverrides={tagColorOverrides}
+          onResetTagColor={onResetTagColor}
+          onSetTagColor={onSetTagColor}
+        />
+      ) : null}
 
       {selectedStar ? (
         <StarDetailPopover

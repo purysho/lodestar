@@ -122,6 +122,7 @@ export default function App() {
   const [selectedStarId, setSelectedStarId] = useState(null)
   const [connectionDraft, setConnectionDraft] = useState(null)
   const [suggestionsVisible, setSuggestionsVisible] = useState(true)
+  const [colorsVisible, setColorsVisible] = useState(true)
   const [dismissedSuggestionIds, setDismissedSuggestionIds] = useState(() => new Set())
   const [selectedSuggestionId, setSelectedSuggestionId] = useState(null)
   const [sharedSky, setSharedSky] = useState(readSharedSkyFromUrl)
@@ -132,6 +133,13 @@ export default function App() {
   const tagColors = useMemo(
     () => deriveTagColors(sky.stars, sky.tagColorOverrides),
     [sky.stars, sky.tagColorOverrides],
+  )
+  const displayTagColors = useMemo(
+    () =>
+      colorsVisible
+        ? tagColors
+        : Object.fromEntries(Object.keys(tagColors).map((tag) => [tag, '#e5e9ff'])),
+    [colorsVisible, tagColors],
   )
   const suggestions = useMemo(
     () =>
@@ -484,12 +492,14 @@ export default function App() {
             A sky that remembers
           </p>
           <SkyToolbar
+            colorsVisible={colorsVisible}
             suggestionCount={suggestions.length}
             suggestionsVisible={suggestionsVisible}
             onAddStar={() => setIsAddingStar(true)}
             onExport={handleExport}
             onImportFile={handleImportFile}
             onShare={handleCreateShareLink}
+            onToggleColors={() => setColorsVisible((visible) => !visible)}
             onToggleSuggestions={() => {
               setSuggestionsVisible((visible) => !visible)
               setSelectedSuggestionId(null)
@@ -499,11 +509,12 @@ export default function App() {
       </header>
 
       <SkyCanvas
+        colorsVisible={colorsVisible}
         connectionDraft={connectionDraft}
         constellations={sky.constellations}
         selectedSuggestion={selectedSuggestion}
         stars={sky.stars}
-        tagColors={tagColors}
+        tagColors={displayTagColors}
         tagColorOverrides={sky.tagColorOverrides}
         suggestions={suggestionsVisible ? suggestions : []}
         selectedStar={selectedStar}
