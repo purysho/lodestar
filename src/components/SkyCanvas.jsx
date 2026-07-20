@@ -5,10 +5,14 @@ import Star from './Star.jsx'
 import StarDetailPopover from './StarDetailPopover.jsx'
 
 function TagColourKey({
+  hiddenTagIds,
   tagColors,
   tagColorOverrides,
+  onHideAllTags,
   onResetTagColor,
   onSetTagColor,
+  onShowAllTags,
+  onToggleTagVisibility,
 }) {
   const tags = Object.keys(tagColors)
   if (tags.length === 0) return null
@@ -16,39 +20,76 @@ function TagColourKey({
   return (
     <aside
       className="absolute bottom-5 left-5 z-20 max-h-44 max-w-[calc(100%-2.5rem)] overflow-y-auto rounded-2xl border border-white/10 bg-night-950/75 px-4 py-3 shadow-xl shadow-black/20 backdrop-blur-sm sm:bottom-8 sm:left-8"
-      aria-label="Tag colour key"
+      aria-label="Tag colour filters"
     >
-      <p className="text-[0.65rem] font-semibold uppercase tracking-[0.16em] text-slate-500">
-        Tag colour key
-      </p>
-      <div className="mt-2 flex max-w-lg flex-wrap gap-2">
-        {tags.map((tag) => (
-          <div
-            key={tag}
-            className="flex items-center gap-1 rounded-full border border-white/10 bg-night-900/65 py-1 pl-1.5 pr-2"
+      <div className="flex items-center justify-between gap-4">
+        <p className="text-[0.65rem] font-semibold uppercase tracking-[0.16em] text-slate-500">
+          Filter by colour
+        </p>
+        <div className="flex items-center gap-1" aria-label="Colour filter shortcuts">
+          <button
+            className="rounded-full px-2 py-1 text-[0.65rem] font-medium text-slate-400 transition hover:bg-white/5 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-aurora"
+            type="button"
+            onClick={onShowAllTags}
           >
-            <input
-              className="tag-colour-input"
-              type="color"
-              aria-label={`Change ${tag} colour`}
-              value={tagColors[tag]}
-              onInput={(event) => onSetTagColor(tag, event.target.value)}
-            />
-            <span className="tag-chip" style={{ '--tag-color': tagColors[tag] }}>
-              {tag}
-            </span>
-            {tagColorOverrides[tag] ? (
+            All
+          </button>
+          <button
+            className="rounded-full px-2 py-1 text-[0.65rem] font-medium text-slate-400 transition hover:bg-white/5 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-aurora"
+            type="button"
+            onClick={onHideAllTags}
+          >
+            None
+          </button>
+        </div>
+      </div>
+      <div className="mt-2 flex max-w-lg flex-wrap gap-2">
+        {tags.map((tag) => {
+          const isVisible = !hiddenTagIds.has(tag)
+
+          return (
+            <div
+              key={tag}
+              className={`flex items-center gap-1 rounded-full border py-1 pl-1.5 pr-2 transition ${
+                isVisible
+                  ? 'border-white/10 bg-night-900/65'
+                  : 'border-white/5 bg-night-950/65 opacity-50'
+              }`}
+            >
+              <input
+                className="tag-colour-input"
+                type="color"
+                aria-label={`Change ${tag} colour`}
+                value={tagColors[tag]}
+                onInput={(event) => onSetTagColor(tag, event.target.value)}
+              />
               <button
-                className="rounded-full px-1 text-xs text-slate-500 transition hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-aurora"
+                className="rounded-full px-1 py-0.5 transition hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-aurora"
                 type="button"
-                aria-label={`Reset ${tag} colour`}
-                onClick={() => onResetTagColor(tag)}
+                aria-label={`${isVisible ? 'Hide' : 'Show'} ${tag} nodes`}
+                aria-pressed={isVisible}
+                onClick={() => onToggleTagVisibility(tag)}
               >
-                ↺
+                <span
+                  className={`tag-chip ${isVisible ? '' : 'line-through'}`}
+                  style={{ '--tag-color': tagColors[tag] }}
+                >
+                  {tag}
+                </span>
               </button>
-            ) : null}
-          </div>
-        ))}
+              {tagColorOverrides[tag] ? (
+                <button
+                  className="rounded-full px-1 text-xs text-slate-500 transition hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-aurora"
+                  type="button"
+                  aria-label={`Reset ${tag} colour`}
+                  onClick={() => onResetTagColor(tag)}
+                >
+                  ↺
+                </button>
+              ) : null}
+            </div>
+          )
+        })}
       </div>
     </aside>
   )
@@ -56,8 +97,10 @@ function TagColourKey({
 
 export default function SkyCanvas({
   stars,
+  totalStarCount,
   constellations,
   suggestions,
+  hiddenTagIds,
   tagColors,
   tagColorOverrides,
   selectedStar,
@@ -72,6 +115,7 @@ export default function SkyCanvas({
   onDeleteStar,
   onDismissSuggestion,
   onDisconnectStars,
+  onHideAllTags,
   onMoveStar,
   onRenameConstellation,
   onResetTagColor,
@@ -79,7 +123,9 @@ export default function SkyCanvas({
   onSelectStar,
   onSetConnectionMeaning,
   onSetTagColor,
+  onShowAllTags,
   onStartConnection,
+  onToggleTagVisibility,
   onUpdateStarTags,
   matchingStarIds,
 }) {
@@ -97,6 +143,7 @@ export default function SkyCanvas({
           suggestions={suggestions}
           tagColors={tagColors}
           matchingStarIds={matchingStarIds}
+          hiddenTagIds={hiddenTagIds}
           onSelectSuggestion={onSelectSuggestion}
         />
         {stars.map((star) => (
@@ -107,6 +154,7 @@ export default function SkyCanvas({
             isSelected={star.id === selectedStar?.id}
             star={star}
             tagColors={tagColors}
+            hiddenTagIds={hiddenTagIds}
             onMove={onMoveStar}
             onSelect={onSelectStar}
           />
@@ -121,30 +169,48 @@ export default function SkyCanvas({
           <div className="max-w-md">
             <div className="mx-auto mb-8 h-1.5 w-1.5 rounded-full bg-starlight shadow-star" />
             <h1 className="font-display text-3xl leading-tight text-slate-100 sm:text-4xl">
-              Your sky is empty.
+              {totalStarCount === 0 ? 'Your sky is empty.' : 'No colours are visible.'}
             </h1>
             <p className="mt-4 text-sm leading-6 text-slate-400 sm:text-base">
-              Add something that struck you.
+              {totalStarCount === 0
+                ? 'Add something that struck you.'
+                : 'Choose a tag from the colour key.'}
             </p>
-            <button
-              className="mt-6 rounded-full border border-aurora/45 bg-night-900/70 px-5 py-2.5 text-sm font-medium text-starlight transition hover:border-aurora hover:bg-night-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-aurora"
-              type="button"
-              onClick={onAddStar}
-            >
-              Place your first light
-            </button>
-            <p className="mt-6 text-xs leading-6 text-slate-500">
-              A question that stays with you · a link worth returning to · a thought to keep nearby
-            </p>
+            {totalStarCount === 0 ? (
+              <>
+                <button
+                  className="mt-6 rounded-full border border-aurora/45 bg-night-900/70 px-5 py-2.5 text-sm font-medium text-starlight transition hover:border-aurora hover:bg-night-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-aurora"
+                  type="button"
+                  onClick={onAddStar}
+                >
+                  Place your first light
+                </button>
+                <p className="mt-6 text-xs leading-6 text-slate-500">
+                  A question that stays with you · a link worth returning to · a thought to keep nearby
+                </p>
+              </>
+            ) : (
+              <button
+                className="mt-6 rounded-full border border-aurora/45 bg-night-900/70 px-5 py-2.5 text-sm font-medium text-starlight transition hover:border-aurora hover:bg-night-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-aurora"
+                type="button"
+                onClick={onShowAllTags}
+              >
+                Show all colours
+              </button>
+            )}
           </div>
         </div>
       ) : null}
 
       <TagColourKey
+        hiddenTagIds={hiddenTagIds}
         tagColors={tagColors}
         tagColorOverrides={tagColorOverrides}
+        onHideAllTags={onHideAllTags}
         onResetTagColor={onResetTagColor}
         onSetTagColor={onSetTagColor}
+        onShowAllTags={onShowAllTags}
+        onToggleTagVisibility={onToggleTagVisibility}
       />
 
       {selectedStar ? (

@@ -12,6 +12,7 @@ function hashString(value) {
 export default function Star({
   star,
   tagColors,
+  hiddenTagIds,
   isSelected,
   isConnectionOrigin,
   isDimmed,
@@ -25,7 +26,9 @@ export default function Star({
   const ageInDays = Math.max(0, (Date.now() - Date.parse(star.createdAt)) / 86_400_000)
   const recencyGlow = Math.max(0, 1 - ageInDays / 30)
   const radius = 3.4 + recencyGlow * 1.2
-  const visibleTags = normalizeTags(star.tags).slice(0, 3)
+  const visibleTags = normalizeTags(star.tags)
+    .filter((tag) => !hiddenTagIds.has(tag))
+    .slice(0, 3)
   const primaryTagColor = tagColors[visibleTags[0]] ?? '#fff4cf'
 
   function handlePointerDown(event) {
@@ -77,6 +80,7 @@ export default function Star({
       tabIndex="0"
       aria-label={`${star.title}. Star in your sky.`}
       aria-pressed={isSelected}
+      data-primary-tag={visibleTags[0] ?? 'neutral'}
       data-connection-origin={isConnectionOrigin ? 'true' : 'false'}
       data-filtered-out={isDimmed ? 'true' : 'false'}
       style={{

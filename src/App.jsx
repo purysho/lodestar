@@ -125,6 +125,7 @@ export default function App() {
   const [selectedStarId, setSelectedStarId] = useState(null)
   const [connectionDraft, setConnectionDraft] = useState(null)
   const [suggestionsVisible, setSuggestionsVisible] = useState(true)
+  const [hiddenTagIds, setHiddenTagIds] = useState(() => new Set())
   const [dismissedSuggestionIds, setDismissedSuggestionIds] = useState(() => new Set())
   const [selectedSuggestionId, setSelectedSuggestionId] = useState(null)
   const [sharedSky, setSharedSky] = useState(readSharedSkyFromUrl)
@@ -136,10 +137,21 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState('')
   const [isConstellationIndexOpen, setIsConstellationIndexOpen] = useState(false)
 
-  const selectedStar = sky.stars.find((star) => star.id === selectedStarId) ?? null
   const tagColors = useMemo(
     () => deriveTagColors(sky.stars, sky.tagColorOverrides),
     [sky.stars, sky.tagColorOverrides],
+  )
+  const visibleStars = useMemo(
+    () =>
+      sky.stars.filter((star) => {
+        const tags = normalizeTags(star.tags)
+        return tags.length === 0 || tags.some((tag) => !hiddenTagIds.has(tag))
+      }),
+    [hiddenTagIds, sky.stars],
+  )
+  const visibleStarIds = useMemo(
+    () => new Set(visibleStars.map((star) => star.id)),
+    [visibleStars],
   )
   const suggestions = useMemo(
     () =>
@@ -148,8 +160,24 @@ export default function App() {
       ),
     [dismissedSuggestionIds, sky.constellations, sky.stars],
   )
+  const visibleSuggestions = useMemo(
+    () =>
+      suggestions
+        .map((suggestion) => ({
+          ...suggestion,
+          sharedTags: suggestion.sharedTags.filter((tag) => !hiddenTagIds.has(tag)),
+        }))
+        .filter(
+          (suggestion) =>
+            visibleStarIds.has(suggestion.starIds[0]) &&
+            visibleStarIds.has(suggestion.starIds[1]) &&
+            suggestion.sharedTags.length > 0,
+        ),
+    [hiddenTagIds, suggestions, visibleStarIds],
+  )
+  const selectedStar = visibleStars.find((star) => star.id === selectedStarId) ?? null
   const selectedSuggestion =
-    suggestions.find((suggestion) => suggestion.id === selectedSuggestionId) ?? null
+    visibleSuggestions.find((suggestion) => suggestion.id === selectedSuggestionId) ?? null
   const searchResults = useMemo(
     () => searchStars(sky.stars, searchQuery),
     [searchQuery, sky.stars],
@@ -335,6 +363,32 @@ export default function App() {
     })
   }
 
+  function resetSelectionForColourFilter() {
+    setConnectionDraft(null)
+    setSelectedStarId(null)
+    setSelectedSuggestionId(null)
+  }
+
+  function handleToggleTagVisibility(tag) {
+    setHiddenTagIds((current) => {
+      const next = new Set(current)
+      if (next.has(tag)) next.delete(tag)
+      else next.add(tag)
+      return next
+    })
+    resetSelectionForColourFilter()
+  }
+
+  function handleShowAllTags() {
+    setHiddenTagIds(new Set())
+    resetSelectionForColourFilter()
+  }
+
+  function handleHideAllTags() {
+    setHiddenTagIds(new Set(Object.keys(tagColors)))
+    resetSelectionForColourFilter()
+  }
+
   function handleSetConnectionMeaning(
     constellationId,
     firstStarId,
@@ -425,6 +479,7 @@ export default function App() {
   function replaceSky(nextSky, message) {
     setUndoState({ sky: structuredClone(sky), label: 'Sky replacement' })
     setSky(saveSky(nextSky))
+    setHiddenTagIds(new Set())
     setConnectionDraft(null)
     setSelectedStarId(null)
     setSelectedSuggestionId(null)
@@ -522,7 +577,7 @@ export default function App() {
           <SkyToolbar
             addButtonRef={addStarButtonRef}
             constellationCount={sky.constellations.length}
-            suggestionCount={suggestions.length}
+            suggestionCount={visibleSuggestions.length}
             suggestionsVisible={suggestionsVisible}
             onAddStar={() => setIsAddingStar(true)}
             onExport={handleExport}
@@ -548,11 +603,13 @@ export default function App() {
       <SkyCanvas
         connectionDraft={connectionDraft}
         constellations={sky.constellations}
+        hiddenTagIds={hiddenTagIds}
         selectedSuggestion={selectedSuggestion}
-        stars={sky.stars}
+        stars={visibleStars}
+        totalStarCount={sky.stars.length}
         tagColors={tagColors}
         tagColorOverrides={sky.tagColorOverrides}
-        suggestions={suggestionsVisible ? suggestions : []}
+        suggestions={suggestionsVisible ? visibleSuggestions : []}
         selectedStar={selectedStar}
         onAcceptSuggestion={handleAcceptSuggestion}
         onAddStar={() => setIsAddingStar(true)}
@@ -564,13 +621,16 @@ export default function App() {
         onDismissSuggestion={handleDismissSuggestion}
         onDisconnectStars={handleDisconnectStars}
         onMoveStar={handleMoveStar}
+        onHideAllTags={handleHideAllTags}
         onRenameConstellation={handleRenameConstellation}
         onResetTagColor={handleResetTagColor}
         onSelectSuggestion={setSelectedSuggestionId}
         onSelectStar={handleSelectStar}
         onSetConnectionMeaning={handleSetConnectionMeaning}
         onSetTagColor={handleSetTagColor}
+        onShowAllTags={handleShowAllTags}
         onStartConnection={handleStartConnection}
+        onToggleTagVisibility={handleToggleTagVisibility}
         onUpdateStarTags={handleUpdateStarTags}
         matchingStarIds={matchingStarIds}
       />
