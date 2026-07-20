@@ -72,6 +72,13 @@ textarea {
   stroke-width: 2px;
 }
 
+.star-node[aria-pressed='true'] .star-core {
+  fill: #ffffff;
+  filter:
+    drop-shadow(0 0 5px rgba(255, 244, 207, 1))
+    drop-shadow(0 0 14px rgba(159, 174, 255, 0.72));
+}
+
 @keyframes twinkle {
   0%,
   100% {

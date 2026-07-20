@@ -23,6 +23,9 @@ function positionForStar(index) {
 export default function App() {
   const [sky, setSky] = useState(() => loadSky())
   const [isAddingStar, setIsAddingStar] = useState(false)
+  const [selectedStarId, setSelectedStarId] = useState(null)
+
+  const selectedStar = sky.stars.find((star) => star.id === selectedStarId) ?? null
 
   function handleAddStar(values) {
     setSky((currentSky) => {
@@ -44,6 +47,33 @@ export default function App() {
       return saveSky(nextSky)
     })
     setIsAddingStar(false)
+  }
+
+  function handleMoveStar(starId, position) {
+    setSky((currentSky) =>
+      saveSky({
+        ...currentSky,
+        stars: currentSky.stars.map((star) =>
+          star.id === starId ? { ...star, ...position } : star,
+        ),
+      }),
+    )
+  }
+
+  function handleDeleteStar(starId) {
+    setSky((currentSky) =>
+      saveSky({
+        ...currentSky,
+        stars: currentSky.stars.filter((star) => star.id !== starId),
+        constellations: currentSky.constellations
+          .map((constellation) => ({
+            ...constellation,
+            starIds: constellation.starIds.filter((id) => id !== starId),
+          }))
+          .filter((constellation) => constellation.starIds.length > 0),
+      }),
+    )
+    setSelectedStarId(null)
   }
 
   return (
@@ -70,7 +100,14 @@ export default function App() {
         </div>
       </header>
 
-      <SkyCanvas stars={sky.stars} />
+      <SkyCanvas
+        stars={sky.stars}
+        selectedStar={selectedStar}
+        onCloseStar={() => setSelectedStarId(null)}
+        onDeleteStar={handleDeleteStar}
+        onMoveStar={handleMoveStar}
+        onSelectStar={setSelectedStarId}
+      />
 
       {isAddingStar ? (
         <AddStarForm onCancel={() => setIsAddingStar(false)} onSave={handleAddStar} />

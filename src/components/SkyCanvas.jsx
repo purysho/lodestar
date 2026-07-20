@@ -1,13 +1,27 @@
 import React from 'react'
 
 import Star from './Star.jsx'
+import StarDetailPopover from './StarDetailPopover.jsx'
 
-export default function SkyCanvas({ stars }) {
+export default function SkyCanvas({
+  stars,
+  selectedStar,
+  onCloseStar,
+  onDeleteStar,
+  onMoveStar,
+  onSelectStar,
+}) {
   return (
     <section className="absolute inset-0 z-10" aria-label="Your sky">
       <svg className="h-full w-full" role="group" aria-label={`${stars.length} stars in your sky`}>
         {stars.map((star) => (
-          <Star key={star.id} star={star} />
+          <Star
+            key={star.id}
+            isSelected={star.id === selectedStar?.id}
+            star={star}
+            onMove={onMoveStar}
+            onSelect={onSelectStar}
+          />
         ))}
       </svg>
 
@@ -26,6 +40,14 @@ export default function SkyCanvas({ stars }) {
             </p>
           </div>
         </div>
+      ) : null}
+
+      {selectedStar ? (
+        <StarDetailPopover
+          star={selectedStar}
+          onClose={onCloseStar}
+          onDelete={() => onDeleteStar(selectedStar.id)}
+        />
       ) : null}
     </section>
   )
