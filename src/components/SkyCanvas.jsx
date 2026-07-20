@@ -7,24 +7,37 @@ import StarDetailPopover from './StarDetailPopover.jsx'
 export default function SkyCanvas({
   stars,
   constellations,
+  suggestions,
   selectedStar,
+  selectedSuggestion,
   connectionDraft,
+  onAcceptSuggestion,
   onCancelConnection,
   onCloseStar,
+  onCloseSuggestion,
   onDeleteConstellation,
   onDeleteStar,
+  onDismissSuggestion,
   onDisconnectStars,
   onMoveStar,
   onRenameConstellation,
+  onSelectSuggestion,
   onSelectStar,
   onStartConnection,
 }) {
   const connectionOrigin = stars.find((star) => star.id === connectionDraft?.fromStarId)
+  const starsById = new Map(stars.map((star) => [star.id, star]))
+  const suggestionStars = selectedSuggestion?.starIds.map((starId) => starsById.get(starId))
 
   return (
     <section className="absolute inset-0 z-10" aria-label="Your sky">
       <svg className="h-full w-full" role="group" aria-label={`${stars.length} stars in your sky`}>
-        <ConstellationLayer constellations={constellations} stars={stars} />
+        <ConstellationLayer
+          constellations={constellations}
+          stars={stars}
+          suggestions={suggestions}
+          onSelectSuggestion={onSelectSuggestion}
+        />
         {stars.map((star) => (
           <Star
             key={star.id}
@@ -84,6 +97,49 @@ export default function SkyCanvas({
             Cancel
           </button>
         </div>
+      ) : null}
+
+      {selectedSuggestion && suggestionStars?.every(Boolean) ? (
+        <aside
+          className="absolute bottom-6 right-4 z-30 w-[calc(100%-2rem)] max-w-sm rounded-2xl border border-aurora/20 bg-night-900/95 p-5 shadow-2xl shadow-black/40 backdrop-blur-md sm:bottom-8 sm:right-8"
+          aria-labelledby="suggestion-title"
+        >
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-xs uppercase tracking-[0.16em] text-aurora/70">A faint possibility</p>
+              <h2 id="suggestion-title" className="mt-2 font-display text-xl text-starlight">
+                {suggestionStars[0].title} · {suggestionStars[1].title}
+              </h2>
+            </div>
+            <button
+              className="-mr-2 -mt-2 rounded-full px-2 py-1 text-lg text-slate-500 transition hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-aurora"
+              type="button"
+              aria-label="Close suggestion"
+              onClick={onCloseSuggestion}
+            >
+              ×
+            </button>
+          </div>
+          <p className="mt-3 text-sm text-slate-400">
+            Shared {selectedSuggestion.sharedTags.join(' · ')}
+          </p>
+          <div className="mt-5 flex justify-end gap-2 border-t border-white/10 pt-4">
+            <button
+              className="rounded-full px-3 py-2 text-sm text-slate-400 transition hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-aurora"
+              type="button"
+              onClick={() => onDismissSuggestion(selectedSuggestion.id)}
+            >
+              Dismiss
+            </button>
+            <button
+              className="rounded-full bg-starlight px-4 py-2 text-sm font-semibold text-night-950 transition hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-aurora"
+              type="button"
+              onClick={() => onAcceptSuggestion(selectedSuggestion)}
+            >
+              Make it a constellation
+            </button>
+          </div>
+        </aside>
       ) : null}
     </section>
   )

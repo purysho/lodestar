@@ -97,6 +97,33 @@ textarea {
   vector-effect: non-scaling-stroke;
 }
 
+.suggestion-line,
+.suggestion-hit-area {
+  vector-effect: non-scaling-stroke;
+}
+
+.suggestion-hit-area {
+  cursor: pointer;
+  pointer-events: stroke;
+  stroke: transparent;
+  stroke-width: 16px;
+}
+
+.suggestion-line {
+  pointer-events: none;
+  stroke: rgba(159, 174, 255, 0.28);
+  stroke-dasharray: 2 7;
+  stroke-linecap: round;
+  stroke-width: 1.2px;
+}
+
+.suggested-connection:hover .suggestion-line,
+.suggested-connection:focus .suggestion-line {
+  filter: drop-shadow(0 0 3px rgba(159, 174, 255, 0.5));
+  stroke: rgba(190, 200, 255, 0.58);
+  stroke-width: 1.6px;
+}
+
 @keyframes twinkle {
   0%,
   100% {

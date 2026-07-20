@@ -1,9 +1,11 @@
 import React from 'react'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 
 import AddStarForm from './components/AddStarForm.jsx'
 import SkyCanvas from './components/SkyCanvas.jsx'
+import SkyToolbar from './components/SkyToolbar.jsx'
 import { loadSky, saveSky } from './lib/store.js'
+import { deriveSuggestions } from './lib/suggestions.js'
 
 function createId(prefix) {
   const token = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`
@@ -60,8 +62,20 @@ export default function App() {
   const [isAddingStar, setIsAddingStar] = useState(false)
   const [selectedStarId, setSelectedStarId] = useState(null)
   const [connectionDraft, setConnectionDraft] = useState(null)
+  const [suggestionsVisible, setSuggestionsVisible] = useState(true)
+  const [dismissedSuggestionIds, setDismissedSuggestionIds] = useState(() => new Set())
+  const [selectedSuggestionId, setSelectedSuggestionId] = useState(null)
 
   const selectedStar = sky.stars.find((star) => star.id === selectedStarId) ?? null
+  const suggestions = useMemo(
+    () =>
+      deriveSuggestions(sky.stars, sky.constellations).filter(
+        (suggestion) => !dismissedSuggestionIds.has(suggestion.id),
+      ),
+    [dismissedSuggestionIds, sky.constellations, sky.stars],
+  )
+  const selectedSuggestion =
+    suggestions.find((suggestion) => suggestion.id === selectedSuggestionId) ?? null
 
   function handleAddStar(values) {
     setSky((currentSky) => {
@@ -218,6 +232,41 @@ export default function App() {
     )
   }
 
+  function handleAcceptSuggestion(suggestion) {
+    setSky((currentSky) => {
+      const alreadyAuthored = currentSky.constellations.some((constellation) =>
+        constellation.starIds.some(
+          (starId, index) =>
+            (starId === suggestion.starIds[0] &&
+              constellation.starIds[index + 1] === suggestion.starIds[1]) ||
+            (starId === suggestion.starIds[1] &&
+              constellation.starIds[index + 1] === suggestion.starIds[0]),
+        ),
+      )
+
+      if (alreadyAuthored) return currentSky
+
+      return saveSky({
+        ...currentSky,
+        constellations: [
+          ...currentSky.constellations,
+          {
+            id: createId('con'),
+            name: '',
+            starIds: [...suggestion.starIds],
+            createdAt: new Date().toISOString(),
+          },
+        ],
+      })
+    })
+    setSelectedSuggestionId(null)
+  }
+
+  function handleDismissSuggestion(suggestionId) {
+    setDismissedSuggestionIds((current) => new Set([...current, suggestionId]))
+    setSelectedSuggestionId(null)
+  }
+
   return (
     <main className="sky-shell relative min-h-screen overflow-hidden bg-night-950 text-white">
       <header className="relative z-20 flex items-center justify-between px-6 py-6 sm:px-10">
@@ -232,28 +281,36 @@ export default function App() {
           <p className="hidden text-xs tracking-[0.16em] text-slate-400 sm:block">
             A sky that remembers
           </p>
-          <button
-            className="rounded-full border border-aurora/40 bg-night-800/70 px-4 py-2 text-sm font-medium tracking-wide text-slate-100 transition hover:border-aurora hover:bg-night-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-aurora"
-            type="button"
-            onClick={() => setIsAddingStar(true)}
-          >
-            Add a star
-          </button>
+          <SkyToolbar
+            suggestionCount={suggestions.length}
+            suggestionsVisible={suggestionsVisible}
+            onAddStar={() => setIsAddingStar(true)}
+            onToggleSuggestions={() => {
+              setSuggestionsVisible((visible) => !visible)
+              setSelectedSuggestionId(null)
+            }}
+          />
         </div>
       </header>
 
       <SkyCanvas
         connectionDraft={connectionDraft}
         constellations={sky.constellations}
+        selectedSuggestion={selectedSuggestion}
         stars={sky.stars}
+        suggestions={suggestionsVisible ? suggestions : []}
         selectedStar={selectedStar}
+        onAcceptSuggestion={handleAcceptSuggestion}
         onCancelConnection={() => setConnectionDraft(null)}
         onCloseStar={() => setSelectedStarId(null)}
+        onCloseSuggestion={() => setSelectedSuggestionId(null)}
         onDeleteConstellation={handleDeleteConstellation}
         onDeleteStar={handleDeleteStar}
+        onDismissSuggestion={handleDismissSuggestion}
         onDisconnectStars={handleDisconnectStars}
         onMoveStar={handleMoveStar}
         onRenameConstellation={handleRenameConstellation}
+        onSelectSuggestion={setSelectedSuggestionId}
         onSelectStar={handleSelectStar}
         onStartConnection={handleStartConnection}
       />
