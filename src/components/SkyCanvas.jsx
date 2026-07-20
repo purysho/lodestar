@@ -64,6 +64,7 @@ export default function SkyCanvas({
   selectedSuggestion,
   connectionDraft,
   onAcceptSuggestion,
+  onAddStar,
   onCancelConnection,
   onCloseStar,
   onCloseSuggestion,
@@ -80,6 +81,7 @@ export default function SkyCanvas({
   onSetTagColor,
   onStartConnection,
   onUpdateStarTags,
+  matchingStarIds,
 }) {
   const connectionOrigin = stars.find((star) => star.id === connectionDraft?.fromStarId)
   const starsById = new Map(stars.map((star) => [star.id, star]))
@@ -94,12 +96,14 @@ export default function SkyCanvas({
           stars={stars}
           suggestions={suggestions}
           tagColors={tagColors}
+          matchingStarIds={matchingStarIds}
           onSelectSuggestion={onSelectSuggestion}
         />
         {stars.map((star) => (
           <Star
             key={star.id}
             isConnectionOrigin={star.id === connectionDraft?.fromStarId}
+            isDimmed={matchingStarIds ? !matchingStarIds.has(star.id) : false}
             isSelected={star.id === selectedStar?.id}
             star={star}
             tagColors={tagColors}
@@ -111,7 +115,7 @@ export default function SkyCanvas({
 
       {stars.length === 0 ? (
         <div
-          className="pointer-events-none absolute inset-0 flex items-center justify-center px-6 pb-20 text-center"
+          className="absolute inset-0 flex items-center justify-center px-6 pb-20 text-center"
           aria-live="polite"
         >
           <div className="max-w-md">
@@ -121,6 +125,16 @@ export default function SkyCanvas({
             </h1>
             <p className="mt-4 text-sm leading-6 text-slate-400 sm:text-base">
               Add something that struck you.
+            </p>
+            <button
+              className="mt-6 rounded-full border border-aurora/45 bg-night-900/70 px-5 py-2.5 text-sm font-medium text-starlight transition hover:border-aurora hover:bg-night-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-aurora"
+              type="button"
+              onClick={onAddStar}
+            >
+              Place your first light
+            </button>
+            <p className="mt-6 text-xs leading-6 text-slate-500">
+              A question that stays with you · a link worth returning to · a thought to keep nearby
             </p>
           </div>
         </div>

@@ -54,6 +54,12 @@ describe('the Lodestar store', () => {
     expect(loadSky({ storage: createMemoryStorage() })).toEqual(createEmptySky())
   })
 
+  it('recovers to a fresh sky when browser storage contains malformed data', () => {
+    const storage = createMemoryStorage({ [STORAGE_KEY]: '{not json' })
+
+    expect(loadSky({ storage })).toEqual(createEmptySky())
+  })
+
   it('runs ordered migrations when loading an older blob', () => {
     const order = []
     const versionOne = {
@@ -162,6 +168,14 @@ describe('the Lodestar store', () => {
     ).toThrow('invalid star coordinates')
   })
 
+  it('rejects a sky from a newer schema instead of overwriting it', () => {
+    const futureSky = { ...createSky(), schemaVersion: 3 }
+
+    expect(() => importSky(JSON.stringify(futureSky))).toThrow(
+      'Sky schema version 3 is newer than 2.',
+    )
+  })
+
   it('round-trips authored tag colours and connection meanings', () => {
     const sky = createSky()
     sky.stars.push({
@@ -217,5 +231,16 @@ describe('the Lodestar store', () => {
       'tagColorOverrides',
     ])
     expect(JSON.stringify(persisted)).not.toContain('suggest')
+  })
+
+  it('does not write invalid data to storage', () => {
+    const storage = createMemoryStorage()
+    const invalidSky = createSky()
+    invalidSky.stars[0].x = 1.2
+
+    expect(() => saveSky(invalidSky, { storage })).toThrow(
+      'star coordinates outside the sky',
+    )
+    expect(storage.setItem).not.toHaveBeenCalled()
   })
 })

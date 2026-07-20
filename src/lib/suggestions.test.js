@@ -80,6 +80,23 @@ describe('tag-derived suggestions', () => {
     )
   })
 
+  it('treats only adjacent stars in a constellation as authored connections', () => {
+    const constellations = [
+      {
+        id: 'con-1',
+        name: 'A path',
+        starIds: ['star-a', 'star-b', 'star-d'],
+        createdAt: '2026-07-20T12:00:00.000Z',
+      },
+    ]
+
+    const suggestionIds = deriveSuggestions(stars, constellations).map(({ id }) => id)
+
+    expect(suggestionIds).not.toContain('suggestion:star-a:star-b')
+    expect(suggestionIds).not.toContain('suggestion:star-b:star-d')
+    expect(suggestionIds).toContain('suggestion:star-a:star-d')
+  })
+
   it('does not mutate stars or constellations while deriving links', () => {
     const originalStars = structuredClone(stars)
     const constellations = []

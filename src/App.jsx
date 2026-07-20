@@ -1,9 +1,12 @@
 import React from 'react'
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 
 import AddStarForm from './components/AddStarForm.jsx'
+import ConstellationIndex from './components/ConstellationIndex.jsx'
 import SkyCanvas from './components/SkyCanvas.jsx'
+import SkySearch from './components/SkySearch.jsx'
 import SkyToolbar from './components/SkyToolbar.jsx'
+import { searchStars } from './lib/search.js'
 import {
   decodeSky,
   encodeSky,
@@ -127,6 +130,11 @@ export default function App() {
   const [sharedSky, setSharedSky] = useState(readSharedSkyFromUrl)
   const [shareUrl, setShareUrl] = useState('')
   const [notice, setNotice] = useState('')
+  const [undoState, setUndoState] = useState(null)
+  const addStarButtonRef = useRef(null)
+  const [isSearching, setIsSearching] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [isConstellationIndexOpen, setIsConstellationIndexOpen] = useState(false)
 
   const selectedStar = sky.stars.find((star) => star.id === selectedStarId) ?? null
   const tagColors = useMemo(
@@ -142,6 +150,18 @@ export default function App() {
   )
   const selectedSuggestion =
     suggestions.find((suggestion) => suggestion.id === selectedSuggestionId) ?? null
+  const searchResults = useMemo(
+    () => searchStars(sky.stars, searchQuery),
+    [searchQuery, sky.stars],
+  )
+  const matchingStarIds = searchQuery.trim()
+    ? new Set(searchResults.map((star) => star.id))
+    : null
+
+  function closeAddStarForm() {
+    setIsAddingStar(false)
+    globalThis.requestAnimationFrame(() => addStarButtonRef.current?.focus())
+  }
 
   function handleAddStar(values) {
     setSky((currentSky) => {
@@ -163,7 +183,7 @@ export default function App() {
 
       return saveSky(nextSky)
     })
-    setIsAddingStar(false)
+    closeAddStarForm()
   }
 
   function handleMoveStar(starId, position) {
@@ -178,16 +198,19 @@ export default function App() {
   }
 
   function handleDeleteStar(starId) {
-    setSky((currentSky) =>
+    const previousSky = structuredClone(sky)
+    setUndoState({ sky: previousSky, label: 'Star deletion' })
+    setSky(
       saveSky({
-        ...currentSky,
-        stars: currentSky.stars.filter((star) => star.id !== starId),
-        constellations: currentSky.constellations.flatMap((constellation) =>
+        ...sky,
+        stars: sky.stars.filter((star) => star.id !== starId),
+        constellations: sky.constellations.flatMap((constellation) =>
           removeStarFromConstellation(constellation, starId),
         ),
       }),
     )
     setSelectedStarId(null)
+    setNotice('Star deleted.')
   }
 
   function handleStartConnection(starId, constellationId = null) {
@@ -349,14 +372,18 @@ export default function App() {
   }
 
   function handleDeleteConstellation(constellationId) {
-    setSky((currentSky) =>
+    const previousSky = structuredClone(sky)
+    setUndoState({ sky: previousSky, label: 'Constellation deletion' })
+    setSky(
       saveSky({
-        ...currentSky,
-        constellations: currentSky.constellations.filter(
+        ...sky,
+        constellations: sky.constellations.filter(
           (constellation) => constellation.id !== constellationId,
         ),
       }),
     )
+    setIsConstellationIndexOpen(false)
+    setNotice('Constellation deleted.')
   }
 
   function handleAcceptSuggestion(suggestion) {
@@ -396,6 +423,7 @@ export default function App() {
   }
 
   function replaceSky(nextSky, message) {
+    setUndoState({ sky: structuredClone(sky), label: 'Sky replacement' })
     setSky(saveSky(nextSky))
     setConnectionDraft(null)
     setSelectedStarId(null)
@@ -403,6 +431,14 @@ export default function App() {
     setDismissedSuggestionIds(new Set())
     setShareUrl('')
     setNotice(message)
+  }
+
+  function handleUndo() {
+    if (!undoState) return
+
+    setSky(saveSky(undoState.sky))
+    setUndoState(null)
+    setNotice(`${undoState.label} undone.`)
   }
 
   function handleExport() {
@@ -484,11 +520,22 @@ export default function App() {
             A sky that remembers
           </p>
           <SkyToolbar
+            addButtonRef={addStarButtonRef}
+            constellationCount={sky.constellations.length}
             suggestionCount={suggestions.length}
             suggestionsVisible={suggestionsVisible}
             onAddStar={() => setIsAddingStar(true)}
             onExport={handleExport}
             onImportFile={handleImportFile}
+            onOpenConstellations={() => {
+              setIsSearching(false)
+              setSearchQuery('')
+              setIsConstellationIndexOpen(true)
+            }}
+            onOpenSearch={() => {
+              setIsConstellationIndexOpen(false)
+              setIsSearching(true)
+            }}
             onShare={handleCreateShareLink}
             onToggleSuggestions={() => {
               setSuggestionsVisible((visible) => !visible)
@@ -508,6 +555,7 @@ export default function App() {
         suggestions={suggestionsVisible ? suggestions : []}
         selectedStar={selectedStar}
         onAcceptSuggestion={handleAcceptSuggestion}
+        onAddStar={() => setIsAddingStar(true)}
         onCancelConnection={() => setConnectionDraft(null)}
         onCloseStar={() => setSelectedStarId(null)}
         onCloseSuggestion={() => setSelectedSuggestionId(null)}
@@ -524,10 +572,41 @@ export default function App() {
         onSetTagColor={handleSetTagColor}
         onStartConnection={handleStartConnection}
         onUpdateStarTags={handleUpdateStarTags}
+        matchingStarIds={matchingStarIds}
       />
 
+      {isSearching ? (
+        <SkySearch
+          query={searchQuery}
+          results={searchResults}
+          tags={Object.keys(tagColors)}
+          onClose={() => {
+            setIsSearching(false)
+            setSearchQuery('')
+          }}
+          onQueryChange={setSearchQuery}
+          onSelectStar={(starId) => {
+            setSelectedStarId(starId)
+            setIsSearching(false)
+            setSearchQuery('')
+          }}
+        />
+      ) : null}
+
+      {isConstellationIndexOpen ? (
+        <ConstellationIndex
+          constellations={sky.constellations}
+          stars={sky.stars}
+          onClose={() => setIsConstellationIndexOpen(false)}
+          onSelect={(constellation) => {
+            setSelectedStarId(constellation.starIds[0] ?? null)
+            setIsConstellationIndexOpen(false)
+          }}
+        />
+      ) : null}
+
       {isAddingStar ? (
-        <AddStarForm onCancel={() => setIsAddingStar(false)} onSave={handleAddStar} />
+        <AddStarForm onCancel={closeAddStarForm} onSave={handleAddStar} />
       ) : null}
 
       {shareUrl ? (
@@ -610,10 +689,19 @@ export default function App() {
 
       {notice ? (
         <div
-          className="absolute bottom-4 left-1/2 z-50 max-w-[calc(100%-2rem)] -translate-x-1/2 rounded-full border border-white/10 bg-night-900/95 px-4 py-2 text-center text-sm text-slate-300 shadow-xl shadow-black/30"
-          role="status"
+          className="absolute bottom-4 left-1/2 z-50 flex max-w-[calc(100%-2rem)] items-center gap-3 -translate-x-1/2 rounded-full border border-white/10 bg-night-900/95 px-4 py-2 text-center text-sm text-slate-300 shadow-xl shadow-black/30"
+          aria-live="polite"
         >
-          {notice}
+          <span>{notice}</span>
+          {undoState ? (
+            <button
+              className="rounded-full border border-aurora/35 px-3 py-1 text-xs font-medium text-aurora transition hover:border-aurora hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-aurora"
+              type="button"
+              onClick={handleUndo}
+            >
+              Undo
+            </button>
+          ) : null}
         </div>
       ) : null}
     </main>

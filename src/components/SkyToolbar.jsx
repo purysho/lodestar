@@ -1,13 +1,17 @@
 import React from 'react'
 
 export default function SkyToolbar({
+  constellationCount,
   suggestionCount,
   suggestionsVisible,
   onAddStar,
   onExport,
   onImportFile,
+  onOpenConstellations,
+  onOpenSearch,
   onShare,
   onToggleSuggestions,
+  addButtonRef,
 }) {
   function handleFileChange(event) {
     const file = event.target.files?.[0]
@@ -17,6 +21,21 @@ export default function SkyToolbar({
 
   return (
     <div className="flex min-w-0 flex-wrap items-center justify-end gap-2" aria-label="Sky controls">
+      <button
+        className="rounded-full border border-white/10 bg-night-900/60 px-3 py-2 text-xs text-slate-300 transition hover:border-white/25 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-aurora sm:text-sm"
+        type="button"
+        onClick={onOpenConstellations}
+      >
+        Constellations
+        {constellationCount > 0 ? ` · ${constellationCount}` : ''}
+      </button>
+      <button
+        className="rounded-full border border-white/10 bg-night-900/60 px-3 py-2 text-xs text-slate-300 transition hover:border-white/25 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-aurora sm:text-sm"
+        type="button"
+        onClick={onOpenSearch}
+      >
+        Find
+      </button>
       <button
         className="rounded-full border border-white/10 bg-night-900/60 px-3 py-2 text-xs text-slate-300 transition hover:border-white/25 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-aurora sm:px-4 sm:text-sm"
         type="button"
@@ -51,6 +70,7 @@ export default function SkyToolbar({
         Share
       </button>
       <button
+        ref={addButtonRef}
         className="rounded-full border border-aurora/40 bg-night-800/70 px-4 py-2 text-xs font-medium tracking-wide text-slate-100 transition hover:border-aurora hover:bg-night-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-aurora sm:text-sm"
         type="button"
         aria-label="Add a star"

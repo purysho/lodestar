@@ -14,6 +14,7 @@ export default function Star({
   tagColors,
   isSelected,
   isConnectionOrigin,
+  isDimmed,
   onMove,
   onSelect,
 }) {
@@ -77,6 +78,7 @@ export default function Star({
       aria-label={`${star.title}. Star in your sky.`}
       aria-pressed={isSelected}
       data-connection-origin={isConnectionOrigin ? 'true' : 'false'}
+      data-filtered-out={isDimmed ? 'true' : 'false'}
       style={{
         '--star-tag-color': primaryTagColor,
         '--twinkle-delay': `${-(hash % 37) / 10}s`,
