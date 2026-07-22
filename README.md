@@ -56,8 +56,22 @@ Lodestar is the memory layer for two stateless discovery projects:
   surfaces questions humanity has not answered.
 - Lodestar remembers what stayed with you.
 
-The star schema already reserves an `origin` field for a future trilogy handoff,
-but ingest is intentionally outside this MVP.
+### Send to sky
+
+The handoff is live. Both discovery tools have a **Send to sky** / **Add to
+sky** button that opens Lodestar with the item pre-loaded as a star. Because the
+three sites live on separate GitHub Pages origins and cannot share
+`localStorage`, the item travels **through the URL**: the sender encodes a small
+payload into the hash (`…/lodestar/#/add?s=<encoded>`), and Lodestar reads it on
+boot, validates and sanitizes it (untrusted input), assigns the star its `id`,
+position, and `createdAt`, dedupes against what you already have, and lands it —
+then strips the payload from the address bar. The `origin` field records where
+each star came from (`treasure-hunt`, `atlas`, or `manual`).
+
+The shared payload + encoding contract lives in
+[`src/lib/starLink.js`](src/lib/starLink.js) and is mirrored verbatim in both
+senders; a round-trip test on each side keeps them in lockstep. No backend, no
+shared storage — the URL is the entire wire.
 
 ## Engineering notes
 
