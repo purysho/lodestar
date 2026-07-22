@@ -1,5 +1,5 @@
 import React from 'react'
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 import AddStarForm from './components/AddStarForm.jsx'
 import ConstellationIndex from './components/ConstellationIndex.jsx'
@@ -17,12 +17,24 @@ import {
   saveSky,
 } from './lib/store.js'
 import {
+  decodeStarPayload,
+  dedupeKey,
+  isEncodedPayloadTooLarge,
+  readIncomingEncoded,
+  validateStarPayload,
+} from './lib/starLink.js'
+import {
   deriveSuggestions,
   deriveTagColors,
   getEdgeKey,
   getSharedTags,
   normalizeTags,
 } from './lib/suggestions.js'
+
+// Arrival-friction seam (brief §5.7): a future 'confirm' screen or batch handler
+// slots in behind this flag without touching the senders. Default: land instantly.
+const INCOMING_STAR_MODE = 'instant'
+const INCOMING_STAR_ERROR = "We couldn't read that shared star."
 
 function createId(prefix) {
   const token = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`
@@ -190,6 +202,85 @@ export default function App() {
     setIsAddingStar(false)
     globalThis.requestAnimationFrame(() => addStarButtonRef.current?.focus())
   }
+
+  function landIncomingStar(payload) {
+    // Idempotency: refresh / back / re-share must not duplicate. Match an
+    // existing star by the same origin + normalized url (or origin + title).
+    const key = dedupeKey(payload)
+    const existing = sky.stars.find(
+      (star) => dedupeKey({ origin: star.origin, url: star.url, title: star.title }) === key,
+    )
+
+    if (existing) {
+      setSelectedStarId(existing.id)
+      setNotice('That star is already in your sky.')
+      return
+    }
+
+    // Lodestar owns id / position / createdAt — never trust them from a payload.
+    const id = createId('star')
+    const nextSky = saveSky({
+      ...sky,
+      stars: [
+        ...sky.stars,
+        {
+          id,
+          title: payload.title,
+          note: payload.note,
+          tags: normalizeTags(payload.tags),
+          url: payload.url,
+          ...positionForStar(sky.stars.length),
+          origin: payload.origin,
+          createdAt: new Date().toISOString(),
+        },
+      ],
+    })
+
+    setSky(nextSky)
+    setSelectedStarId(id)
+    setNotice('A new star landed in your sky.')
+  }
+
+  // Single entry point for an inbound star (brief §5.7). The payload is
+  // untrusted URL input: validate + sanitize first, then land per the mode flag.
+  function handleIncomingStar(payload, mode = INCOMING_STAR_MODE) {
+    const result = validateStarPayload(payload)
+
+    if (!result.ok) {
+      setNotice(INCOMING_STAR_ERROR)
+      return
+    }
+
+    if (mode !== 'instant') return // seam: a confirm/batch handler lands here later
+
+    landIncomingStar(result.payload)
+  }
+
+  useEffect(() => {
+    const encoded = readIncomingEncoded(globalThis.location?.hash ?? '')
+    if (!encoded) return
+
+    // Strip the payload from the URL FIRST so refresh, back-button, or a
+    // StrictMode re-invocation can never re-trigger ingestion.
+    clearShareHash()
+
+    if (isEncodedPayloadTooLarge(encoded)) {
+      setNotice(INCOMING_STAR_ERROR)
+      return
+    }
+
+    let payload
+    try {
+      payload = decodeStarPayload(encoded)
+    } catch {
+      setNotice(INCOMING_STAR_ERROR)
+      return
+    }
+
+    handleIncomingStar(payload)
+    // Runs once on mount; the incoming star is a boot-time concern.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   function handleAddStar(values) {
     setSky((currentSky) => {
